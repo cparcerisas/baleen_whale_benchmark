@@ -21,6 +21,7 @@ class SpectrogramDataSet:
         self.image_height = image_height
         self.image_width = image_width
         self.n_channels = n_channels
+        self.n_classes = len(self.categories)
 
     def _load_data(self, samples_per_class, noise_ratio, locations_to_exclude=None):
         paths_list = []
@@ -41,12 +42,21 @@ class SpectrogramDataSet:
                     all_images = all_images.loc[~all_images.str.contains(loc)]
 
             # Select a random amount
-            selected_images = all_images.sample(min(len(all_images), int(samples_per_class)))
+            if samples_per_class == 'all':
+                last_img = -1
+            else:
+                # Sort the images, we only want the n first ones
+                order = all_images.str.extract('(\d+)').astype(int)
+                order = order.sort_values(0)
+                all_images = all_images.loc[order.index]
+                last_img = min(len(all_images), int(samples_per_class))
+            selected_images = all_images.iloc[:last_img]
             for img_path in selected_images:
                 img_array = cv2.imread(os.path.join(path, img_path))
 
-                resized_image = cv2.resize(img_array, (self.image_width, self.image_height))
-                grey_image = np.mean(resized_image, axis=2)
+                # Not necessary if images already on the correct format
+                # resized_image = cv2.resize(img_array, (self.image_width, self.image_height))
+                grey_image = np.mean(img_array, axis=2)
                 images.append(grey_image)
                 labels.append(cat_i)
                 paths_list.append(img_path)

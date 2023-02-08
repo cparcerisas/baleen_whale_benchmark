@@ -1,6 +1,6 @@
 {
   "VALID_SPLIT": 0.7,
-  "TEST_SPLIT": 0.7,
+  "TEST_SPLIT": "blocked",
   "BATCH_SIZE": 32,
   "EPOCHS": 100,
   "LEARNING_RATE": 1e-3,
@@ -14,11 +14,10 @@
   "model_name": "IdilCNN",
   "binary": true,
   "start_from_old": null,
-  "DATA_DIR": "C:/Users/cleap/Documents/Data/Sound Data/small_correctedDataset",
+  "DATA_DIR": "C:/Users/cleap/Documents/Data/Sound Data/cnn_small_corrected",
   "OUTPUT_DIR": "//fs/shared/onderzoek/6. Marine Observation Center/Projects/Side_Projects/Acoustics/CNN_vs_noise",
   "LOCATIONS": ["BallenyIsland", "Casey", "ElephantIsland", "SKerguelenPlateau", "Greenwich", "MaudRise"],
-  "CATEGORIES" : ["20Hz20Plus", "ABZ", "DDswp", "Noise"],
-  "SAMPLES_PER_CLASS": 20,
-  "NOISE_RATIO": 0.8,
-  "test_split": "blocked"
+  "CATEGORIES" : ["20Plus", "20Hz", "A", "B", "D", "Dswp", "Z"],
+  "SAMPLES_PER_CLASS": 250,
+  "NOISE_RATIO": 0.8
 }

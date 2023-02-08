@@ -10,7 +10,7 @@ All the parameters have to be defined in a config file config.json and then the 
 Config file: 
 
 * VALID_SPLIT: proportion of the data to use for validation (TOTAL data, not training data)
-* TEST_SPLIT: proportion of the TOTAL data to use for test. It will be ignored if blocked cross validation
+* TEST_SPLIT: proportion of the TOTAL data to use for test. Set to "blocked" for blocked testing
 * BATCH_SIZE: batch size
 * EPOCHS: number of epochs
 * LEARNING_RATE: 1e-3
@@ -21,9 +21,10 @@ Config file:
 * OUTPUT_DIR: path to the folder where all the results will be stored
 * LOCATIONS: List of the locations to include
 * CATEGORIES : List of the categories to include
-* SAMPLES_PER_CLASS: number of samples per class (except noise)
+* SAMPLES_PER_CLASS: number of samples per class (except noise). It does not randomly select the samples but only the 
+first n samples of each class. This is to avoid a non-real representation of a small dataset, usually users annotate a 
+certain period. If set to "all" it will take all the available ones
 * NOISE_RATIO: proportion of noise of the total dataset compared to the total number of calls
-* threshold_results: threshold to use to compute the probable class
 
 ```json 
 {
@@ -46,7 +47,7 @@ Config file:
   "OUTPUT_DIR": "//fs/shared/onderzoek/6. Marine Observation Center/Projects/Side_Projects/Acoustics/CNN_vs_noise",
   "LOCATIONS": ["BallenyIsland", "Casey", "ElephantIsland", "SKerguelenPlateau", "Greenwich", "MaudRise"],
   "CATEGORIES" : ["20Hz20Plus", "ABZ", "DDswp", "Noise"],
-  "SAMPLES_PER_CLASS": 26000,
+  "SAMPLES_PER_CLASS": 25000,
   "NOISE_RATIO": 0.8
 }
 ```

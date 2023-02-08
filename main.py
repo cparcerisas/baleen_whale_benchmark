@@ -39,10 +39,9 @@ import dataset
 IMAGE_HEIGHT = 90
 IMAGE_WIDTH = 30
 N_CHANNELS = 1
-N_CLASSES = 4
 
 
-def create_model(logpath):
+def create_model(logpath, n_classes):
     model = tf.keras.models.Sequential()
     model.add(tf.keras.layers.Conv2D(32, kernel_size=(3, 3), activation='relu', padding="same",
                                      kernel_initializer='he_normal', input_shape=(IMAGE_WIDTH, IMAGE_HEIGHT, 1)))
@@ -67,7 +66,7 @@ def create_model(logpath):
     model.add(tf.keras.layers.Dense(64, kernel_regularizer=regularizers.l2(0.001)))
     model.add(tf.keras.layers.ReLU())
     model.add(tf.keras.layers.Dropout(0.3))
-    model.add(tf.keras.layers.Dense(N_CLASSES, activation='softmax'))
+    model.add(tf.keras.layers.Dense(n_classes, activation='softmax'))
 
     model_summary_path = logpath.joinpath('model_summary.txt')
     # Open the file
@@ -182,14 +181,14 @@ if __name__ == '__main__':
     ds = dataset.SpectrogramDataSet(data_dir=config['DATA_DIR'], image_width=IMAGE_WIDTH, image_height=IMAGE_HEIGHT,
                                     categories=config['CATEGORIES'], locations=config['LOCATIONS'],
                                     n_channels=N_CHANNELS)
-    if type(config['test_split']) == float:
+    if type(config['TEST_SPLIT']) == float:
         x_train, y_train, x_valid, y_valid, x_test, y_test = ds.load_all_dataset(test_size=config['TEST_SPLIT'],
                                                                                  valid_size=config['VALID_SPLIT'],
                                                                                  samples_per_class=config[
                                                                                      'SAMPLES_PER_CLASS'],
                                                                                  noise_ratio=config['NOISE_RATIO'])
         # Create and train the model
-        cnn_model = create_model(logpath)
+        cnn_model = create_model(logpath, n_classes=ds.n_classes)
         history = train_model(cnn_model, x_train, y_train, x_valid, y_valid, config['BATCH_SIZE'], config['EPOCHS'])
     else:
         for loc in config['LOCATIONS']:
@@ -200,5 +199,5 @@ if __name__ == '__main__':
                                                                               noise_ratio=config['NOISE_RATIO'],
                                                                               blocked_location=loc)
             # Create and train the model
-            cnn_model = create_model(logpath)
+            cnn_model = create_model(logpath, n_classes=ds.n_classes)
             history = train_model(cnn_model, x_train, y_train, x_valid, y_valid, config['BATCH_SIZE'], config['EPOCHS'])
