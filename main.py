@@ -88,46 +88,8 @@ def train_model(model, x_train, y_train, x_valid, y_valid, batch_size, epochs):
     return model, history
 
 
-def test_model(model, x_test, y_test):
+def test_model(model, x_test, y_test, categories, save_path):
     scores = model.evaluate(x_test, y_test, verbose=0)
-
-
-def plot_metrics(model, history, save_path=None):
-    """
-    Plot the history evolution of the metrics of the model
-    :param history:
-    :param save_path:
-    :return:
-    """
-    p = history.history
-    training_acc = history.history['acc']
-    val_acc = history.history['val_acc']
-    training_loss = history.history['loss']
-    val_loss = history.history['val_loss']
-
-    epoch_count = range(1, len(training_acc) + 1)
-    figure = plt.figure(figsize=(8, 8))
-    plt.plot(epoch_count, training_acc, 'r--')
-    plt.plot(epoch_count, val_acc, 'b-')
-    plt.legend(['Training acc', 'Validation acc'])
-    plt.xlabel('Epoch')
-    plt.ylabel('Accuracy')
-    plt.yticks(np.arange(0, 1, 0.05))
-    plt.xticks(np.arange(0, max(epoch_count), 2))
-    plt.text(10, 0.01, "Test acc: " + str(scores[1]))
-    plt.grid()
-    plt.show()
-    figure = plt.figure(figsize=(8, 8))
-    plt.plot(epoch_count, training_loss, 'g--')
-    plt.plot(epoch_count, val_loss, 'r-')
-    plt.legend(['Training loss', 'Validation loss'])
-    plt.xlabel('Epoch')
-    plt.ylabel('Loss')
-    plt.yticks(np.arange(0, max(val_loss), 0.2))
-    plt.xticks(np.arange(0, max(epoch_count), 2))
-    plt.grid()
-    plt.show()
-
     y_pred = model.predict(x_test)
     y_pred = np.argmax(y_pred, axis=1)
     con_mat = confusion_matrix(y_test, y_pred)
@@ -136,16 +98,55 @@ def plot_metrics(model, history, save_path=None):
 
     con_mat_norm = np.around(con_mat.astype('float') / con_mat.sum(axis=1)[:, np.newaxis], decimals=2)
 
-    con_mat_df = pd.DataFrame(con_mat_norm,
-                              index=CATEGORIES,
-                              columns=CATEGORIES)
+    con_mat_df = pd.DataFrame(con_mat_norm, index=categories, columns=categories)
 
     figure = plt.figure(figsize=(8, 8))
     sns.heatmap(con_mat_df, annot=True, cmap=plt.cm.Blues)
     plt.tight_layout()
     plt.ylabel('True label')
     plt.xlabel('Predicted label')
+    plt.savefig(save_path.joinpath('confusion_matrix.png'))
     plt.show()
+
+
+def plot_training_metrics(history, save_path):
+    """
+    Plot the history evolution of the metrics of the model
+    :param history:
+    :param save_path:
+    :return:
+    """
+    training_acc = history.history['acc']
+    val_acc = history.history['val_acc']
+    training_loss = history.history['loss']
+    val_loss = history.history['val_loss']
+
+    epoch_count = range(1, len(training_acc) + 1)
+    plt.figure(figsize=(8, 8))
+    plt.plot(epoch_count, training_acc, 'r--')
+    plt.plot(epoch_count, val_acc, 'b-')
+    plt.legend(['Training acc', 'Validation acc'])
+    plt.xlabel('Epoch')
+    plt.ylabel('Accuracy')
+    plt.yticks(np.arange(0, 1, 0.05))
+    plt.xticks(np.arange(0, max(epoch_count), 2))
+    # plt.text(10, 0.01, "Test acc: " + str(scores[1]))
+    plt.grid()
+    plt.savefig(save_path.joinpath('fig1.png'))
+    plt.show()
+
+    plt.figure(figsize=(8, 8))
+    plt.plot(epoch_count, training_loss, 'g--')
+    plt.plot(epoch_count, val_loss, 'r-')
+    plt.legend(['Training loss', 'Validation loss'])
+    plt.xlabel('Epoch')
+    plt.ylabel('Loss')
+    plt.yticks(np.arange(0, max(val_loss), 0.2))
+    plt.xticks(np.arange(0, max(epoch_count), 2))
+    plt.grid()
+    plt.savefig(save_path.joinpath('fig2.png'))
+    plt.show()
+
     pass
 
 
@@ -189,7 +190,7 @@ if __name__ == '__main__':
                                                                                  noise_ratio=config['NOISE_RATIO'])
         # Create and train the model
         cnn_model = create_model(logpath, n_classes=ds.n_classes)
-        history = train_model(cnn_model, x_train, y_train, x_valid, y_valid, config['BATCH_SIZE'], config['EPOCHS'])
+        cnn_model, history = train_model(cnn_model, x_train, y_train, x_valid, y_valid, config['BATCH_SIZE'], config['EPOCHS'])
     else:
         for loc in config['LOCATIONS']:
             x_train, y_train, x_valid, y_valid, x_test, y_test = ds.load_blocked_dataset(valid_size=config[
@@ -200,4 +201,7 @@ if __name__ == '__main__':
                                                                               blocked_location=loc)
             # Create and train the model
             cnn_model = create_model(logpath, n_classes=ds.n_classes)
-            history = train_model(cnn_model, x_train, y_train, x_valid, y_valid, config['BATCH_SIZE'], config['EPOCHS'])
+            cnn_model, history = train_model(cnn_model, x_train, y_train, x_valid, y_valid, config['BATCH_SIZE'], config['EPOCHS'])
+
+    plot_training_metrics(history, save_path=logpath)
+    test_model(cnn_model, x_test=x_test, y_test=y_test, categories=config['CATEGORIES'], save_path=logpath)
