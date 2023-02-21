@@ -100,13 +100,15 @@ def test_model(model, x_test, y_test, categories, save_path):
 
     con_mat_df = pd.DataFrame(con_mat_norm, index=categories, columns=categories)
 
-    figure = plt.figure(figsize=(8, 8))
+    plt.figure(figsize=(8, 8))
     sns.heatmap(con_mat_df, annot=True, cmap=plt.cm.Blues)
     plt.tight_layout()
     plt.ylabel('True label')
     plt.xlabel('Predicted label')
     plt.savefig(save_path.joinpath('confusion_matrix.png'))
     plt.show()
+
+    return scores
 
 
 def plot_training_metrics(history, save_path):
@@ -161,22 +163,16 @@ def plot_test_predictions(test_ds, model):
     pass
 
 
-# Press the green button in the gutter to run the script.
-if __name__ == '__main__':
+def run_from_config(config, logpath=None):
     tf.random.set_seed(42)
-
-    # Define the parameters for the study
-    config_file = './config.json'
-    # Read the config file
-    f = open(config_file)
-    config = json.load(f)
 
     # Create a log directory to store all the results and parameters
     now_time = datetime.datetime.now()
-    logpath = pathlib.Path(config['OUTPUT_DIR']).joinpath(now_time.strftime('%y%m%d_%H%M%S'))
+    if logpath is None:
+        logpath = pathlib.Path(config['OUTPUT_DIR']).joinpath(now_time.strftime('%y%m%d_%H%M%S'))
     if not logpath.exists():
         os.mkdir(str(logpath))
-    shutil.copyfile(config_file, logpath.joinpath('config.json'))
+    json.dump(config, open(logpath.joinpath('config.json'), mode='a'))
 
     # Load the dataset
     ds = dataset.SpectrogramDataSet(data_dir=config['DATA_DIR'], image_width=IMAGE_WIDTH, image_height=IMAGE_HEIGHT,
@@ -190,18 +186,32 @@ if __name__ == '__main__':
                                                                                  noise_ratio=config['NOISE_RATIO'])
         # Create and train the model
         cnn_model = create_model(logpath, n_classes=ds.n_classes)
-        cnn_model, history = train_model(cnn_model, x_train, y_train, x_valid, y_valid, config['BATCH_SIZE'], config['EPOCHS'])
+        cnn_model, history = train_model(cnn_model, x_train, y_train, x_valid, y_valid, config['BATCH_SIZE'],
+                                         config['EPOCHS'])
     else:
         for loc in config['LOCATIONS']:
             x_train, y_train, x_valid, y_valid, x_test, y_test = ds.load_blocked_dataset(valid_size=config[
-                                                                                  'VALID_SPLIT'],
-                                                                              samples_per_class=config[
-                                                                                  'SAMPLES_PER_CLASS'],
-                                                                              noise_ratio=config['NOISE_RATIO'],
-                                                                              blocked_location=loc)
+                'VALID_SPLIT'],
+                                                                                         samples_per_class=config[
+                                                                                             'SAMPLES_PER_CLASS'],
+                                                                                         noise_ratio=config[
+                                                                                             'NOISE_RATIO'],
+                                                                                         blocked_location=loc)
             # Create and train the model
             cnn_model = create_model(logpath, n_classes=ds.n_classes)
-            cnn_model, history = train_model(cnn_model, x_train, y_train, x_valid, y_valid, config['BATCH_SIZE'], config['EPOCHS'])
+            cnn_model, history = train_model(cnn_model, x_train, y_train, x_valid, y_valid, config['BATCH_SIZE'],
+                                             config['EPOCHS'])
 
     plot_training_metrics(history, save_path=logpath)
-    test_model(cnn_model, x_test=x_test, y_test=y_test, categories=config['CATEGORIES'], save_path=logpath)
+    scores = test_model(cnn_model, x_test=x_test, y_test=y_test, categories=config['CATEGORIES'], save_path=logpath)
+    return scores
+
+
+# Press the green button in the gutter to run the script.
+if __name__ == '__main__':
+    # Define the parameters for the study
+    config_file = './config.json'
+    # Read the config file
+    f = open(config_file)
+    config = json.load(f)
+    run_from_config(config)
