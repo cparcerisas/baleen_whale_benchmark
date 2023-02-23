@@ -1,38 +1,25 @@
 import datetime
 import json
 import os
-import os
 import pathlib
-import pickle
-import shutil
-import time
 from multiprocessing import Pool
 
 import matplotlib.pyplot as plt
 import numpy as np
 import numpy as np
 import pandas as pd
-import scipy
 import seaborn as sns
-import tensorboard
 import tensorflow as tf
-import tensorflow.keras
 from scipy import stats
-from sklearn import datasets, svm
-from sklearn.metrics import ConfusionMatrixDisplay
-from sklearn.metrics import classification_report, confusion_matrix
 from sklearn.metrics import confusion_matrix
 from sklearn.metrics import f1_score
-from sklearn.model_selection import KFold
-from sklearn.utils import compute_class_weight, compute_sample_weight
+from sklearn.model_selection import StratifiedKFold
 from sklearn.utils import shuffle
-from tensorboard.plugins.hparams import api as hp
+from sklearn.model_selection import train_test_split
+
 from tensorflow.keras import regularizers
-from tensorflow.keras.callbacks import EarlyStopping, ModelCheckpoint
 from tensorflow.keras.models import Sequential
-from tensorflow.keras.optimizers import Adam
 from tensorflow.keras.preprocessing.image import ImageDataGenerator
-from tensorflow.keras.utils import plot_model
 
 import dataset
 
@@ -163,6 +150,17 @@ def plot_test_predictions(test_ds, model):
     pass
 
 
+def create_train_and_test_model(logpath, n_classes, x_train, y_train, x_valid, y_valid, x_test, y_test, config):
+    cnn_model = create_model(logpath, n_classes=n_classes)
+    cnn_model, history = train_model(cnn_model, x_train, y_train, x_valid, y_valid, config['BATCH_SIZE'],
+                                     config['EPOCHS'])
+
+    plot_training_metrics(history, save_path=logpath)
+    scores_i = test_model(cnn_model, x_test=x_test, y_test=y_test, categories=config['CATEGORIES'],
+                          save_path=logpath)
+    return scores_i
+
+
 def run_from_config(config, logpath=None):
     tf.random.set_seed(42)
 
@@ -178,17 +176,39 @@ def run_from_config(config, logpath=None):
     ds = dataset.SpectrogramDataSet(data_dir=config['DATA_DIR'], image_width=IMAGE_WIDTH, image_height=IMAGE_HEIGHT,
                                     categories=config['CATEGORIES'], locations=config['LOCATIONS'],
                                     n_channels=N_CHANNELS)
+    scores = pd.DataFrame(columns=['test_fold', 'loss', 'accuracy'])
     if type(config['TEST_SPLIT']) == float:
+        print('Performing single train/validation/test split (random). Ony one result will be given')
         x_train, y_train, x_valid, y_valid, x_test, y_test = ds.load_all_dataset(test_size=config['TEST_SPLIT'],
                                                                                  valid_size=config['VALID_SPLIT'],
                                                                                  samples_per_class=config[
                                                                                      'SAMPLES_PER_CLASS'],
                                                                                  noise_ratio=config['NOISE_RATIO'])
         # Create and train the model
-        cnn_model = create_model(logpath, n_classes=ds.n_classes)
-        cnn_model, history = train_model(cnn_model, x_train, y_train, x_valid, y_valid, config['BATCH_SIZE'],
-                                         config['EPOCHS'])
+        scores_i = create_train_and_test_model(logpath, ds.n_classes, x_train, y_train, x_valid, y_valid, x_test,
+                                               y_test, config)
+        scores.loc[0] = ['random', scores_i[0], scores_i[1]]
+    elif type(config['TEST_SPLIT']) == int:
+        print('Performing K-fold stratified cross validation with K=%s. The cross validation is done in the TEST set, '
+              'The train-validation split is done randomly. This is for better error estimation'
+              'Results are given per fold' % config['TEST_SPLIT'])
+        x, y = ds._load_data(config['SAMPLES_PER_CLASS'], config['NOISE_RATIO'], locations_to_exclude=None)
+        kfold = StratifiedKFold(n_splits=config['TEST_SPLIT'], shuffle=True)
+        for fold, (train_index, test_index) in enumerate(kfold.split(x, y)):
+            x_model = x[train_index]
+            y_model = y[train_index]
+            x_test = x[test_index]
+            y_test = y[test_index]
+            x_train, x_valid, y_train, y_valid = train_test_split(x_model, y_model,
+                                                                  test_size=config['VALID_SPLIT'], shuffle=True)
+
+            # Create and train the model
+            scores_i = create_train_and_test_model(logpath, ds.n_classes, x_train, y_train, x_valid, y_valid,
+                                                   x_test, y_test, config)
+            scores.loc[len(scores)] = [fold, scores_i[0], scores_i[1]]
+
     else:
+        print('Performing blocked cross validation for each location (leave location out)')
         for loc in config['LOCATIONS']:
             x_train, y_train, x_valid, y_valid, x_test, y_test = ds.load_blocked_dataset(valid_size=config[
                 'VALID_SPLIT'],
@@ -198,12 +218,9 @@ def run_from_config(config, logpath=None):
                                                                                              'NOISE_RATIO'],
                                                                                          blocked_location=loc)
             # Create and train the model
-            cnn_model = create_model(logpath, n_classes=ds.n_classes)
-            cnn_model, history = train_model(cnn_model, x_train, y_train, x_valid, y_valid, config['BATCH_SIZE'],
-                                             config['EPOCHS'])
-
-    plot_training_metrics(history, save_path=logpath)
-    scores = test_model(cnn_model, x_test=x_test, y_test=y_test, categories=config['CATEGORIES'], save_path=logpath)
+            scores_i = create_train_and_test_model(logpath, ds.n_classes, x_train, y_train, x_valid, y_valid,
+                                                   x_test, y_test, config)
+            scores.loc[len(scores)] = [loc, scores_i[0], scores_i[1]]
     return scores
 
 

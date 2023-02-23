@@ -11,10 +11,11 @@ if __name__ == '__main__':
     f = open(config_file)
     config = json.load(f)
 
-    noise_results = pd.DataFrame(columns=['noise', 'loss', 'accuracy_test'])
+    noise_results = pd.DataFrame()
     for noise in noise_to_check:
         config['NOISE_RATIO'] = noise/100
-        scores = training.run_from_config(config, logpath=pathlib.Path(config['OUTPUT_DIR']).joinpath('noise_%s' % noise))
-        noise_results.loc[len(noise_results)] = [noise, scores[0], scores[1]]
+        scores_df = training.run_from_config(config, logpath=pathlib.Path(config['OUTPUT_DIR']).joinpath('noise_%s' % noise))
+        scores_df['noise'] = noise
+        noise_results = pd.concat([noise_results, scores_df])
 
-    noise_results.to_csv(config['OUTPUT_DIR'])
+    noise_results.to_csv(pathlib.Path(config['OUTPUT_DIR']).joinpath('noise_comparison.csv'))

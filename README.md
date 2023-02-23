@@ -10,7 +10,10 @@ All the parameters have to be defined in a config file config.json and then the 
 Config file: 
 
 * VALID_SPLIT: proportion of the data to use for validation (TOTAL data, not training data)
-* TEST_SPLIT: proportion of the TOTAL data to use for test. Set to "blocked" for blocked testing
+* TEST_SPLIT: proportion of the TOTAL data to use for test. Set to a float (0 to 1) for a single test training. 
+Set to int for a Stratified KFold Cross-Validation testing strategy. The number entered will be the number of folds. 
+A result for each fold will be given. 
+Set to "blocked" for blocked testing. Each of the locations will be left out once. A result for each run will be given. 
 * BATCH_SIZE: batch size
 * EPOCHS: number of epochs
 * LEARNING_RATE: 1e-3

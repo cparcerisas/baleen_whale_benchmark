@@ -1,6 +1,6 @@
 {
   "VALID_SPLIT": 0.7,
-  "TEST_SPLIT": "blocked",
+  "TEST_SPLIT": 5,
   "BATCH_SIZE": 32,
   "EPOCHS": 10,
   "LEARNING_RATE": 1e-3,

@@ -20,7 +20,7 @@ class SpectrogramDataSet:
         self.image_height = image_height
         self.image_width = image_width
         self.n_channels = n_channels
-        self.n_classes = len(self.categories)
+        self.n_classes = len(categories)
         self.categories = categories
 
     def _load_data(self, samples_per_class, noise_ratio, locations_to_exclude=None):
@@ -70,7 +70,7 @@ class SpectrogramDataSet:
         return x, y
 
     def load_all_dataset(self, test_size, valid_size, samples_per_class, noise_ratio):
-        x, y = self._load_data(locations=self.locations, samples_per_class=samples_per_class, noise_ratio=noise_ratio)
+        x, y = self._load_data(locations_to_exclude=None, samples_per_class=samples_per_class, noise_ratio=noise_ratio)
         x_model, x_test, y_model, y_test = train_test_split(x, y, test_size=test_size, shuffle=True)
         x_train, x_valid, y_train, y_valid = train_test_split(x_model, y_model, test_size=valid_size, shuffle=True)
         return x_train, y_train, x_valid, y_valid, x_test, y_test
