@@ -64,7 +64,7 @@ class SpectrogramDataSet:
                 # resized_image = cv2.resize(img_array, (self.image_width, self.image_height))
                 grey_image = np.mean(img_array, axis=2)
                 images.append(grey_image)
-                # this par is for joinind classes
+                # this part is for joinind classes
                 if collections.Counter(self.join_cat.keys()) != collections.Counter(self.categories):
                     for i in self.join_cat:
                         if category in self.join_cat[i]:
