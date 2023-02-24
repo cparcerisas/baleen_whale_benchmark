@@ -1,6 +1,6 @@
 {
   "VALID_SPLIT": 0.7,
-  "TEST_SPLIT": 5,
+  "TEST_SPLIT": 10,
   "BATCH_SIZE": 32,
   "EPOCHS": 10,
   "LEARNING_RATE": 1e-3,
@@ -14,11 +14,11 @@
   "model_name": "IdilCNN",
   "binary": true,
   "start_from_old": null,
-  "DATA_DIR": "C:/Users/cleap/Documents/Data/Sound Data/cnn_small_corrected",
-  "OUTPUT_DIR": "C:/Users/cleap/Desktop/cnn_and_noise/noise_comparison",
+  "DATA_DIR": "/Users/idililgazkaya/Downloads/Specs",
+  "OUTPUT_DIR": "/Users/idililgazkaya/Downloads",
   "LOCATIONS": ["BallenyIsland", "Casey", "ElephantIsland", "SKerguelenPlateau", "Greenwich", "MaudRise"],
-  "CATEGORIES" : ["20Plus", "20Hz", "A", "B", "D", "Dswp", "Z"],
-  "CATEGORIES_TO_JOIN": {"ABZ":  ["A", "B", "Z"], "DDswp":  ["D", "Dswp"]},
+  "CATEGORIES" : ["20Plus", "20Hz", "A", "B", "D", "Dswp", "Z","Noise"],
+  "CATEGORIES_TO_JOIN": {"20Hz20Plus":  ["20Plus","20Hz"],"AB":  ["A","B"], "Z":  ["Z"], "Dswp": ["Dswp"],"D":["D"] ,"Noise":  ["Noise"]},
   "SAMPLES_PER_CLASS": 250,
   "NOISE_RATIO": 0.8
 }
