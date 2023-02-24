@@ -212,7 +212,7 @@ def run_from_config(config, logpath=None):
             elif fold == config['TEST_SPLIT']-1:
                 c = c + np.asarray(con_mat_norm)
                 np.asarray(c)/config['TEST_SPLIT']
-                pd.DataFrame(c).to_csv(str(logpath)+"/confusion_matrix_ally.csv",header=False, index=False)    
+                pd.DataFrame(c).to_csv(str(logpath)+"/confusion_matrix_all.csv",header=False, index=False)    
                 cdf = pd.DataFrame(c, index=config[ "CATEGORIES_TO_JOIN"].keys(), columns=config[ "CATEGORIES_TO_JOIN"].keys())
                 plt.figure(figsize=(8, 8))
                 sns.heatmap(cdf, annot=True, cmap=plt.cm.Blues)
