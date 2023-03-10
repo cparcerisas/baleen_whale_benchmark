@@ -74,7 +74,7 @@ def train_model(model, x_train, y_train, x_valid, y_valid, batch_size, epochs):
     return model, history
 
 
-def test_model(model, x_test, y_test, categories, save_path):
+def test_model(model, x_test, y_test, categories, save_path, config):
     scores = model.evaluate(x_test, y_test, verbose=0)
     y_pred = model.predict(x_test)
     y_pred = np.argmax(y_pred, axis=1)
@@ -156,7 +156,7 @@ def create_train_and_test_model(logpath, n_classes, x_train, y_train, x_valid, y
 
     plot_training_metrics(history, save_path=logpath)
     scores_i, con_mat_norm = test_model(cnn_model, x_test=x_test, y_test=y_test, categories=config['CATEGORIES'],
-                          save_path=logpath)
+                          save_path=logpath,config=config)
     return scores_i,con_mat_norm
 
 
@@ -229,7 +229,6 @@ def run_from_config(config, logpath=None):
                 plt.ylabel('True label')
                 plt.xlabel('Predicted label')
                 plt.savefig(str(logpath)+'/confusion_matrix_all.png')
-                plt.show()
 
     else:
         print('Performing blocked cross validation for each location (leave location out)')
