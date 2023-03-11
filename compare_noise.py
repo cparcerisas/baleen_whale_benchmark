@@ -25,7 +25,7 @@ if __name__ == '__main__':
     confusion = np.asanyarray(confusion)
     col = ['tomato','royalblue','mediumseagreen','dimgray']
     for i,c in enumerate(confusion.T):
-        plt.scatter(noise_to_check, c,color = col[i],label= list(config[ "CATEGORIES_TO_JOIN"].keys())[i])
+        plt.scatter(noise_to_check, c,color = col[i],alpha=0.4,label= list(config[ "CATEGORIES_TO_JOIN"].keys())[i])
         xnew=np.arange(min((noise_to_check)),max(noise_to_check),1e-1)
         if len(noise_to_check)>3:
             f=interpolate.UnivariateSpline(noise_to_check,c)
@@ -35,6 +35,7 @@ if __name__ == '__main__':
             plt.plot(xnew,g(xnew),'-',color = col[i])
     plt.ylabel('True positive rate')
     plt.xlabel('Noise Percentage')
+    plt.ylim([0,1])
     plt.legend()
     plt.savefig(pathlib.Path(config['OUTPUT_DIR']).joinpath('noise_categories.png')) 
     plt.show()
@@ -43,8 +44,9 @@ if __name__ == '__main__':
 
     col = ['orange','dimgray']
     l = ["Calls","Noise"]
+    plt.figure(figsize=(8, 8))
     for i,c in enumerate(confusion2.T):
-        plt.scatter(noise_to_check, c,color = col[i],label= l[i])
+        plt.scatter(noise_to_check, c,color = col[i],label= l[i],alpha=0.4)
         xnew=np.arange(min((noise_to_check)),max(noise_to_check),1e-1)
         if len(noise_to_check)>3:
             f=interpolate.UnivariateSpline(noise_to_check,c)
@@ -54,6 +56,7 @@ if __name__ == '__main__':
             plt.plot(xnew,g(xnew),'-',color = col[i])
     plt.ylabel('True positive rate')
     plt.xlabel('Noise Percentage')
+    plt.ylim([0,1])
     plt.legend()
     plt.savefig(pathlib.Path(config['OUTPUT_DIR']).joinpath('noise_calls.png')) 
     plt.show() 
