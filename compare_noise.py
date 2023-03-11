@@ -2,20 +2,44 @@ import training
 import json
 import pathlib
 import pandas as pd
-
+import matplotlib.pyplot as plt
+import numpy as np
+from scipy import interpolate
 
 if __name__ == '__main__':
-    noise_to_check = [10, 20, 30, 40, 50, 60, 90, 95, 98]
+    noise_to_check = np.arange (2.5, 100, 2.5).tolist()
     # Read the config file
     config_file = './config.json'
     f = open(config_file)
     config = json.load(f)
 
     noise_results = pd.DataFrame()
+    confusion = []
     for noise in noise_to_check:
         config['NOISE_RATIO'] = noise/100
-        scores_df = training.run_from_config(config, logpath=pathlib.Path(config['OUTPUT_DIR']).joinpath('noise_%s' % noise))
+        scores_df, con = training.run_from_config(config, logpath=pathlib.Path(config['OUTPUT_DIR']).joinpath('noise_%s' % noise))
         scores_df['noise'] = noise
         noise_results = pd.concat([noise_results, scores_df])
+        confusion.append(con.diagonal().tolist())
+    plt.figure(figsize=(8, 8))
+    confusion = np.asanyarray(confusion)
+    col = ['tomato','royalblue','mediumseagreen','dimgray']
+    for i,c in enumerate(confusion.T):
+        plt.scatter(noise_to_check, c,color = col[i],label= list(config[ "CATEGORIES_TO_JOIN"].keys())[i])
+        xnew=np.arange(min((noise_to_check)),max(noise_to_check),1e-1)
+        if len(noise_to_check)>3:
+            f=interpolate.UnivariateSpline(noise_to_check,c)
+            plt.plot(xnew,f(xnew),'-',color = col[i])
+        else:
+            g=interpolate.interp1d(noise_to_check,c)
+            plt.plot(xnew,g(xnew),'-',color = col[i])
+    plt.ylabel('True positive rate')
+    plt.xlabel('Noise Percentage')
+    plt.legend()
+    plt.savefig(pathlib.Path(config['OUTPUT_DIR']).joinpath('noise_comparison.png')) 
+    plt.show()   
+
+
 
     noise_results.to_csv(pathlib.Path(config['OUTPUT_DIR']).joinpath('noise_comparison.csv'))
+
