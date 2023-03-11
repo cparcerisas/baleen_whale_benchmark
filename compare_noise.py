@@ -36,10 +36,25 @@ if __name__ == '__main__':
     plt.ylabel('True positive rate')
     plt.xlabel('Noise Percentage')
     plt.legend()
-    plt.savefig(pathlib.Path(config['OUTPUT_DIR']).joinpath('noise_comparison.png')) 
-    plt.show()   
+    plt.savefig(pathlib.Path(config['OUTPUT_DIR']).joinpath('noise_categories.png')) 
+    plt.show()
+    confusion2 = np.mean(confusion[:,:-1], axis=1)
+    confusion2 = np.c_[ confusion2, confusion[:,-1] ]
 
-
-
+    col = ['orange','dimgray']
+    l = ["Calls","Noise"]
+    for i,c in enumerate(confusion2.T):
+        plt.scatter(noise_to_check, c,color = col[i],label= l[i])
+        xnew=np.arange(min((noise_to_check)),max(noise_to_check),1e-1)
+        if len(noise_to_check)>3:
+            f=interpolate.UnivariateSpline(noise_to_check,c)
+            plt.plot(xnew,f(xnew),'-',color = col[i])
+        else:
+            g=interpolate.interp1d(noise_to_check,c)
+            plt.plot(xnew,g(xnew),'-',color = col[i])
+    plt.ylabel('True positive rate')
+    plt.xlabel('Noise Percentage')
+    plt.legend()
+    plt.savefig(pathlib.Path(config['OUTPUT_DIR']).joinpath('noise_calls.png')) 
+    plt.show() 
     noise_results.to_csv(pathlib.Path(config['OUTPUT_DIR']).joinpath('noise_comparison.csv'))
-
