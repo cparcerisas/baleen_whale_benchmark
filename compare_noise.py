@@ -4,10 +4,43 @@ import pathlib
 import pandas as pd
 import matplotlib.pyplot as plt
 import numpy as np
-from scipy import interpolate
-
+from sklearn.linear_model import LinearRegression
+from sklearn.preprocessing import PolynomialFeatures
+from sklearn.pipeline import Pipeline
 if __name__ == '__main__':
-    noise_to_check = np.arange (2.5, 100, 2.5).tolist()
+
+    def fit_polynomials(X, y, from_=10, to_= 30, step=1):
+        # Store scores and predictions
+        scors = []
+        # Loop between the specified values
+        X = X[:, np.newaxis]
+        y = y[:, np.newaxis]
+        xnew=np.arange(min(X),max(X),1e-1)
+        xnew = xnew[:, np.newaxis]
+        for i, n in enumerate(range(from_, to_+1, step)):
+            # Steps
+            steps = [
+            ('Polynomial', PolynomialFeatures(degree=n)),
+            ('model', LinearRegression())  ] 
+            # Pipeline fit
+            fit_poly = Pipeline(steps).fit(X,y)
+            # Predict
+            poly_pred = fit_poly.predict(xnew)
+            if i == 0:
+                preds = pd.DataFrame(poly_pred, columns=[f'{n}'])
+            else:
+                preds[f'{n}'] = poly_pred
+            # Evaluate
+            model_score = fit_poly.score(X,y)
+            scors.append((n, model_score))
+        s_list = [x[1] for x in scors]
+        smax = max(s_list)
+        max_index = s_list.index(smax)
+        df = preds[str(scors[max_index][0])].copy()
+        return df,xnew
+
+
+    noise_to_check = np.arange (2.5, 52.5, 2.5).tolist()
     # Read the config file
     config_file = './config.json'
     f = open(config_file)
@@ -24,15 +57,11 @@ if __name__ == '__main__':
     plt.figure(figsize=(8, 8))
     confusion = np.asanyarray(confusion)
     col = ['tomato','royalblue','mediumseagreen','dimgray']
+    n = np.asanyarray(noise_to_check)
     for i,c in enumerate(confusion.T):
         plt.scatter(noise_to_check, c,color = col[i],alpha=0.4,label= list(config[ "CATEGORIES_TO_JOIN"].keys())[i])
-        xnew=np.arange(min((noise_to_check)),max(noise_to_check),1e-1)
-        if len(noise_to_check)>3:
-            f=interpolate.UnivariateSpline(noise_to_check,c)
-            plt.plot(xnew,f(xnew),'-',color = col[i])
-        else:
-            g=interpolate.interp1d(noise_to_check,c)
-            plt.plot(xnew,g(xnew),'-',color = col[i])
+        preds, xnew = fit_polynomials(n, c, from_=1, to_=20, step=1)
+        plt.plot(xnew, preds.values,'-',color = col[i])
     plt.ylabel('True positive rate')
     plt.xlabel('Noise Percentage')
     plt.ylim([0,1])
@@ -44,16 +73,12 @@ if __name__ == '__main__':
 
     col = ['orange','dimgray']
     l = ["Calls","Noise"]
+    n = np.asanyarray(noise_to_check)
     plt.figure(figsize=(8, 8))
     for i,c in enumerate(confusion2.T):
         plt.scatter(noise_to_check, c,color = col[i],label= l[i],alpha=0.4)
-        xnew=np.arange(min((noise_to_check)),max(noise_to_check),1e-1)
-        if len(noise_to_check)>3:
-            f=interpolate.UnivariateSpline(noise_to_check,c)
-            plt.plot(xnew,f(xnew),'-',color = col[i])
-        else:
-            g=interpolate.interp1d(noise_to_check,c)
-            plt.plot(xnew,g(xnew),'-',color = col[i])
+        preds, xnew = fit_polynomials(n, c, from_=1, to_=20, step=1)
+        plt.plot(xnew, preds.values,'-',color = col[i])
     plt.ylabel('True positive rate')
     plt.xlabel('Noise Percentage')
     plt.ylim([0,1])
