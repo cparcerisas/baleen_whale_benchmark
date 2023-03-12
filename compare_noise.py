@@ -9,7 +9,7 @@ from sklearn.preprocessing import PolynomialFeatures
 from sklearn.pipeline import Pipeline
 if __name__ == '__main__':
 
-    def fit_polynomials(X, y, from_=10, to_= 30, step=1):
+    def fit_polynomials(X, y, from_=1, to_= 30, step=1):
         # Store scores and predictions
         scors = []
         # Loop between the specified values
