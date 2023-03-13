@@ -64,7 +64,7 @@ if __name__ == '__main__':
     n = np.asanyarray(noise_to_check)
     for i,c in enumerate(confusion.T):
         plt.scatter(noise_to_check, c,color = col[i],alpha=0.4,label= list(config[ "CATEGORIES_TO_JOIN"].keys())[i])
-        preds, xnew = fit_polynomials(n, c, from_=1, to_=20, step=1)
+        preds, xnew = fit_polynomials(n, c, from_=1, to_=5, step=1)
         plt.plot(xnew, preds.values,'-',color = col[i])
     plt.ylabel('True positive rate')
     plt.xlabel('Noise Percentage')
