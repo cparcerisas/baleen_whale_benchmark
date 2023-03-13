@@ -1,15 +1,17 @@
 import training
 import json
 import pathlib
+import datetime
 import pandas as pd
 import matplotlib.pyplot as plt
 import numpy as np
 from sklearn.linear_model import LinearRegression
 from sklearn.preprocessing import PolynomialFeatures
 from sklearn.pipeline import Pipeline
+import os
 if __name__ == '__main__':
 
-    def fit_polynomials(X, y, from_=1, to_= 30, step=1):
+    def fit_polynomials(X, y, from_=1, to_= 10, step=1):
         # Store scores and predictions
         scors = []
         # Loop between the specified values
@@ -40,7 +42,7 @@ if __name__ == '__main__':
         return df,xnew
 
 
-    noise_to_check = np.arange (2.5, 52.5, 2.5).tolist()
+    noise_to_check = np.arange (2.5, 82.5, 2.5).tolist()
     # Read the config file
     config_file = './config.json'
     f = open(config_file)
@@ -48,9 +50,11 @@ if __name__ == '__main__':
 
     noise_results = pd.DataFrame()
     confusion = []
+    path = pathlib.Path(config['OUTPUT_DIR']).joinpath(datetime.datetime.now().strftime('%y%m%d_%H%M%S'))
+    os.mkdir(str(path))
     for noise in noise_to_check:
         config['NOISE_RATIO'] = noise/100
-        scores_df, con = training.run_from_config(config, logpath=pathlib.Path(config['OUTPUT_DIR']).joinpath('noise_%s' % noise))
+        scores_df, con = training.run_from_config(config, logpath=pathlib.Path(path).joinpath('noise_%s' % noise))
         scores_df['noise'] = noise
         noise_results = pd.concat([noise_results, scores_df])
         confusion.append(con.diagonal().tolist())
@@ -66,7 +70,7 @@ if __name__ == '__main__':
     plt.xlabel('Noise Percentage')
     plt.ylim([0,1])
     plt.legend()
-    plt.savefig(pathlib.Path(config['OUTPUT_DIR']).joinpath('noise_categories.png')) 
+    plt.savefig(pathlib.Path(path).joinpath('noise_categories.png')) 
     plt.show()
     confusion2 = np.mean(confusion[:,:-1], axis=1)
     confusion2 = np.c_[ confusion2, confusion[:,-1] ]
@@ -77,12 +81,12 @@ if __name__ == '__main__':
     plt.figure(figsize=(8, 8))
     for i,c in enumerate(confusion2.T):
         plt.scatter(noise_to_check, c,color = col[i],label= l[i],alpha=0.4)
-        preds, xnew = fit_polynomials(n, c, from_=1, to_=20, step=1)
+        preds, xnew = fit_polynomials(n, c, from_=1, to_=5, step=1)
         plt.plot(xnew, preds.values,'-',color = col[i])
     plt.ylabel('True positive rate')
     plt.xlabel('Noise Percentage')
     plt.ylim([0,1])
     plt.legend()
-    plt.savefig(pathlib.Path(config['OUTPUT_DIR']).joinpath('noise_calls.png')) 
+    plt.savefig(pathlib.Path(path).joinpath('noise_calls.png')) 
     plt.show() 
-    noise_results.to_csv(pathlib.Path(config['OUTPUT_DIR']).joinpath('noise_comparison.csv'))
+    noise_results.to_csv(pathlib.Path(path).joinpath('noise_comparison.csv'))
