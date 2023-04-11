@@ -181,7 +181,7 @@ def run_from_config(config, logpath=None):
     # Load the dataset
     ds = dataset.SpectrogramDataSet(data_dir=config['DATA_DIR'], image_width=IMAGE_WIDTH, image_height=IMAGE_HEIGHT,
                                     categories=config['CATEGORIES'], locations=config['LOCATIONS'],
-                                    n_channels=N_CHANNELS, corrected=config['USE_CORRECTED'])
+                                    n_channels=N_CHANNELS, corrected=config['USE_CORRECTED_DATASET'])
     scores = pd.DataFrame(columns=['test_fold', 'loss', 'accuracy'])
     if type(config['TEST_SPLIT']) == float:
         print('Performing single train/validation/test split (random). Ony one result will be given')
