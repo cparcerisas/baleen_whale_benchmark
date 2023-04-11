@@ -27,6 +27,8 @@ IMAGE_HEIGHT = 90
 IMAGE_WIDTH = 30
 N_CHANNELS = 1
 
+CORRECTED_SAMPLES = 2500
+
 
 def create_model(logpath, n_classes):
     model = tf.keras.models.Sequential()
@@ -164,6 +166,10 @@ def create_train_and_test_model(logpath, n_classes, x_train, y_train, x_valid, y
 def run_from_config(config, logpath=None):
     tf.random.set_seed(42)
 
+    if config['USE_CORRECTED_DATASET'] and config['SAMPLES_PER_CLASS'] > CORRECTED_SAMPLES:
+        raise Exception('The SAMPLES_PER_CLASS parameter (%s) is greater than the corrected samples (%s). '
+                        'Please adjust.' % (config['SAMPLES_PER_CLASS'], CORRECTED_SAMPLES))
+
     # Create a log directory to store all the results and parameters
     now_time = datetime.datetime.now()
     if logpath is None:
@@ -175,7 +181,7 @@ def run_from_config(config, logpath=None):
     # Load the dataset
     ds = dataset.SpectrogramDataSet(data_dir=config['DATA_DIR'], image_width=IMAGE_WIDTH, image_height=IMAGE_HEIGHT,
                                     categories=config['CATEGORIES'], locations=config['LOCATIONS'],
-                                    n_channels=N_CHANNELS)
+                                    n_channels=N_CHANNELS, corrected=config['USE_CORRECTED'])
     scores = pd.DataFrame(columns=['test_fold', 'loss', 'accuracy'])
     if type(config['TEST_SPLIT']) == float:
         print('Performing single train/validation/test split (random). Ony one result will be given')

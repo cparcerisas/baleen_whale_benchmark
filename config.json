@@ -14,11 +14,12 @@
   "model_name": "IdilCNN",
   "binary": true,
   "start_from_old": null,
-  "DATA_DIR": "C:/Users/cleap/Documents/Data/Sound Data/cnn_small_corrected",
-  "OUTPUT_DIR": "C:/Users/cleap/Desktop/cnn_and_noise/noise_comparison",
+  "DATA_DIR": "C:/Users/cleap/Documents/Data/Sound Data/cnn_and_noise",
+  "OUTPUT_DIR": "//fs/shared/onderzoek/6. Marine Observation Center/Projects/Side_Projects/Acoustics/CNN_vs_noise/noise_comparison/",
   "LOCATIONS": ["BallenyIsland", "Casey", "ElephantIsland", "SKerguelenPlateau", "Greenwich", "MaudRise"],
   "CATEGORIES" : ["20Plus", "20Hz", "A", "B", "D", "Dswp", "Z"],
   "CATEGORIES_TO_JOIN": {"ABZ":  ["A", "B", "Z"], "DDswp":  ["D", "Dswp"]},
-  "SAMPLES_PER_CLASS": 250,
-  "NOISE_RATIO": 0.8
+  "SAMPLES_PER_CLASS": 2500,
+  "NOISE_RATIO": 0.8,
+  "USE_CORRECTED_DATASET": true
 }

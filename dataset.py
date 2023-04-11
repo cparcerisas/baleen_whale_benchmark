@@ -14,7 +14,7 @@ SHUFFLE_SEED = 43
 
 
 class SpectrogramDataSet:
-    def __init__(self, data_dir, image_width, image_height, categories, locations, n_channels):
+    def __init__(self, data_dir, image_width, image_height, categories, locations, n_channels, corrected):
         self.locations = locations
         self.data_dir = data_dir
         self.image_height = image_height
@@ -22,6 +22,7 @@ class SpectrogramDataSet:
         self.n_channels = n_channels
         self.n_classes = len(categories)
         self.categories = categories
+        self.corrected = corrected
 
     def _load_data(self, samples_per_class, noise_ratio, locations_to_exclude=None):
         paths_list = []
