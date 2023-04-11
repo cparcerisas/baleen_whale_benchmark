@@ -14,7 +14,7 @@ SHUFFLE_SEED = 43
 
 
 class SpectrogramDataSet:
-    def __init__(self, join_cat, data_dir, image_width, image_height, categories, locations, n_channels, corrected):
+    def __init__(self, data_dir, image_width, image_height, categories, join_cat, locations,  n_channels, corrected):
         self.locations = locations
         self.data_dir = data_dir
         self.image_height = image_height
@@ -23,7 +23,24 @@ class SpectrogramDataSet:
         self.categories = categories
         self.corrected = corrected
         self.join_cat = join_cat
-        self.n_classes = len(join_cat)
+
+        # Create an understandable map for joined categories
+        # and their corresponding int representation
+        self.map_join = {}
+        self.classes2int = {}
+        for join_class_name, classes_list in join_cat.items():
+            self.classes2int[join_class_name] = len(self.classes2int.keys())
+            for class_name in classes_list:
+                self.map_join[class_name] = join_class_name
+
+        for cat_name in self.categories:
+            if cat_name not in self.map_join.keys():
+                self.map_join[cat_name] = cat_name
+                self.classes2int[join_class_name] = len(self.classes2int)
+
+        self.n_classes = len(self.classes2int)
+        print('These are the classes: ', self.classes2int)
+        print('Which are formed by doing: ', self.map_join)
 
     def _load_data(self, samples_per_class, noise_ratio, locations_to_exclude=None):
         paths_list = []
@@ -36,27 +53,36 @@ class SpectrogramDataSet:
 
             # Read all the images of that category
             all_images = pd.Series(os.listdir(path))
-            for i in range(len(all_images)):
-                if str(all_images.loc[i])[-3:]!="png" or "._" in str(all_images.loc[i]):
-                    all_images.drop(i , inplace=True)
-               
-            if category == 'Noise':
-                samples_per_class = ((len(self.categories) - 1) * samples_per_class * noise_ratio) / (1 - noise_ratio)
             
             # If there are one or more locations to exclude, exclude them from the list!
             if locations_to_exclude is not None:
                 for loc in locations_to_exclude:
                     all_images = all_images.loc[~all_images.str.contains(loc)]
 
+            # If the dataset is corrected, exclude the corrections
+            joined_cat = self.map_join[category]
+
+            # If using the corrected dataset, eliminate the ones that are not correct
+            if self.corrected:
+                correction_path = os.path.join(self.data_dir, category + '2Noise.csv')
+                if os.path.exists(correction_path):
+                    correction_csv = pd.read_csv(correction_path, header=None)
+                    all_images_joined_names = all_images.str.split('_').str.join('')
+                    all_images = all_images.loc[all_images_joined_names.isin(correction_csv[0])]
+
             # Select a random amount
+            if category == 'Noise':
+                samples_per_class = ((len(self.categories) - 1) * samples_per_class * noise_ratio) / (1 - noise_ratio)
+
             if samples_per_class == 'all':
                 last_img = -1
             else:
                 # Sort the images, we only want the n first ones
-                order = all_images.str.extract('(\d+)').astype(int)
-                order = order.sort_values(0)
-                all_images = all_images.loc[order.index]
+                order = all_images.str.split('_', expand=True)[0].astype(int)
+                order = order.sort_values()
+                all_images = all_images.reindex(order.index)
                 last_img = min(len(all_images), int(samples_per_class))
+
             selected_images = all_images.iloc[:last_img]
             for img_path in selected_images:
                 img_array = cv2.imread(os.path.join(path, img_path))
@@ -65,17 +91,9 @@ class SpectrogramDataSet:
                 # resized_image = cv2.resize(img_array, (self.image_width, self.image_height))
                 grey_image = np.mean(img_array, axis=2)
                 images.append(grey_image)
-                # this part is for joinind classes
-                if collections.Counter(self.join_cat.keys()) != collections.Counter(self.categories):
-                    for i in self.join_cat:
-                        if category in self.join_cat[i]:
-                            labels.append(i)
-                        else:
-                            continue
-                    for num, l_str in enumerate(self.join_cat.keys()):
-                        labels  = [num if l == l_str else l for l in labels]
-                else:
-                    labels.append(cat_i)
+
+                # This part is for joined classes
+                labels.append(self.classes2int[joined_cat])
                 paths_list.append(img_path)
         X = np.array(images).reshape(-1, self.image_width, self.image_height, self.n_channels)
         x = X / 255.0
