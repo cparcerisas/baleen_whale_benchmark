@@ -28,21 +28,24 @@ class SpectrogramDataSet:
         # and their corresponding int representation
         self.map_join = {}
         self.classes2int = {}
+        self.int2class = []
         for join_class_name, classes_list in join_cat.items():
             self.classes2int[join_class_name] = len(self.classes2int.keys())
+            self.int2class.append(join_class_name)
             for class_name in classes_list:
                 self.map_join[class_name] = join_class_name
 
         for cat_name in self.categories:
             if cat_name not in self.map_join.keys():
                 self.map_join[cat_name] = cat_name
-                self.classes2int[join_class_name] = len(self.classes2int)
+                self.classes2int[cat_name] = len(self.classes2int)
+                self.int2class.append(cat_name)
 
         self.n_classes = len(self.classes2int)
         print('These are the classes: ', self.classes2int)
         print('Which are formed by doing: ', self.map_join)
 
-    def _load_data(self, samples_per_class, noise_ratio, locations_to_exclude=None):
+    def load_data(self, samples_per_class, noise_ratio, locations_to_exclude=None):
         paths_list = []
         labels = []
         images = []
@@ -104,19 +107,19 @@ class SpectrogramDataSet:
         return x, y
 
     def load_all_dataset(self, test_size, valid_size, samples_per_class, noise_ratio):
-        x, y = self._load_data(locations_to_exclude=None, samples_per_class=samples_per_class, noise_ratio=noise_ratio)
+        x, y = self.load_data(locations_to_exclude=None, samples_per_class=samples_per_class, noise_ratio=noise_ratio)
         x_model, x_test, y_model, y_test = train_test_split(x, y, test_size=test_size, shuffle=True)
         x_train, x_valid, y_train, y_valid = train_test_split(x_model, y_model, test_size=valid_size, shuffle=True)
         return x_train, y_train, x_valid, y_valid, x_test, y_test
 
     def load_blocked_dataset(self, blocked_location, valid_size, samples_per_class, noise_ratio):
         selected_locs = list(set(self.locations) - {blocked_location})
-        x, y = self._load_data(locations_to_exclude=[blocked_location],
+        x, y = self.load_data(locations_to_exclude=[blocked_location],
                                samples_per_class=samples_per_class,
                                noise_ratio=noise_ratio)
         x_train, x_valid, y_train, y_valid = train_test_split(x, y, test_size=valid_size, shuffle=True)
 
-        x_test, y_test = self._load_data(locations_to_exclude=selected_locs,
+        x_test, y_test = self.load_data(locations_to_exclude=selected_locs,
                                          samples_per_class=samples_per_class, noise_ratio=noise_ratio)
 
         return x_train, y_train, x_valid, y_valid, x_test, y_test

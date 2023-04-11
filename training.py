@@ -2,24 +2,17 @@ import datetime
 import json
 import os
 import pathlib
-from multiprocessing import Pool
 
 import matplotlib.pyplot as plt
-import numpy as np
 import numpy as np
 import pandas as pd
 import seaborn as sns
 import tensorflow as tf
-from scipy import stats
 from sklearn.metrics import confusion_matrix
 from sklearn.metrics import f1_score
 from sklearn.model_selection import StratifiedKFold
-from sklearn.utils import shuffle
 from sklearn.model_selection import train_test_split
-
 from tensorflow.keras import regularizers
-from tensorflow.keras.models import Sequential
-from tensorflow.keras.preprocessing.image import ImageDataGenerator
 
 import dataset
 
@@ -65,6 +58,7 @@ def create_model(logpath, n_classes):
 
     return model
 
+
 def train_model(model, x_train, y_train, x_valid, y_valid, batch_size, epochs):
     opt = tf.keras.optimizers.Adam()
     model.compile(loss='sparse_categorical_crossentropy',
@@ -76,7 +70,7 @@ def train_model(model, x_train, y_train, x_valid, y_valid, batch_size, epochs):
     return model, history
 
 
-def test_model(model, x_test, y_test, categories, save_path, config):
+def test_model(model, x_test, y_test, categories, save_path):
     scores = model.evaluate(x_test, y_test, verbose=0)
     y_pred = model.predict(x_test)
     y_pred = np.argmax(y_pred, axis=1)
@@ -86,17 +80,19 @@ def test_model(model, x_test, y_test, categories, save_path, config):
 
     con_mat_norm = np.around(con_mat.astype('float') / con_mat.sum(axis=1)[:, np.newaxis], decimals=2)
 
-    con_mat_df = pd.DataFrame(con_mat_norm, index=list(config[ "CATEGORIES_TO_JOIN"].keys()), columns=list(config[ "CATEGORIES_TO_JOIN"].keys()))
+    con_mat_df = pd.DataFrame(con_mat_norm, index=categories, columns=categories)
 
     plt.figure(figsize=(8, 8))
-    sns.heatmap(con_mat_df, annot=True, cmap=plt.cm.Blues)
+    ax = sns.heatmap(con_mat_df, annot=True, cmap=plt.cm.Blues)
     plt.tight_layout()
     plt.ylabel('True label')
     plt.xlabel('Predicted label')
+    ax.xaxis.set_label_position('top')
+    ax.xaxis.tick_top()
     plt.savefig(save_path.joinpath('confusion_matrix.png'))
     plt.show()
 
-    return scores, con_mat_norm
+    return scores, con_mat_df
 
 
 def plot_training_metrics(history, save_path):
@@ -151,14 +147,15 @@ def plot_test_predictions(test_ds, model):
     pass
 
 
-def create_train_and_test_model(logpath, n_classes, x_train, y_train, x_valid, y_valid, x_test, y_test, config):
+def create_train_and_test_model(logpath, n_classes, x_train, y_train, x_valid, y_valid, x_test, y_test,
+                                config, categories):
     cnn_model = create_model(logpath, n_classes=n_classes)
     cnn_model, history = train_model(cnn_model, x_train, y_train, x_valid, y_valid, config['BATCH_SIZE'],
                                      config['EPOCHS'])
 
     plot_training_metrics(history, save_path=logpath)
-    scores_i, con_mat_norm = test_model(cnn_model, x_test=x_test, y_test=y_test, categories=config['CATEGORIES'],
-                          save_path=logpath, config=config)
+    scores_i, con_mat_norm = test_model(cnn_model, x_test=x_test, y_test=y_test, categories=categories,
+                                        save_path=logpath)
     return scores_i, con_mat_norm
 
 
@@ -183,6 +180,7 @@ def run_from_config(config, logpath=None):
                                     locations=config['LOCATIONS'], n_channels=N_CHANNELS,
                                     corrected=config['USE_CORRECTED_DATASET'])
     scores = pd.DataFrame(columns=['test_fold', 'loss', 'accuracy'])
+    con_matrix = pd.DataFrame()
     if type(config['TEST_SPLIT']) == float:
         print('Performing single train/validation/test split (random). Ony one result will be given')
         x_train, y_train, x_valid, y_valid, x_test, y_test = ds.load_all_dataset(test_size=config['TEST_SPLIT'],
@@ -191,18 +189,17 @@ def run_from_config(config, logpath=None):
                                                                                      'SAMPLES_PER_CLASS'],
                                                                                  noise_ratio=config['NOISE_RATIO'])
         # Create and train the model
-        scores_i, con_mat_norm = create_train_and_test_model(logpath, ds.n_classes, x_train, y_train, x_valid, y_valid,
-                                                             x_test, y_test, config)
+        scores_i, con_matrix_i = create_train_and_test_model(logpath, ds.n_classes, x_train, y_train, x_valid, y_valid,
+                                                             x_test, y_test, config, categories=ds.int2class)
         scores.loc[0] = ['random', scores_i[0], scores_i[1]]
-        # s = np.asarray(scores)
-        # pd.DataFrame(s).to_csv(str(logpath)+"/score.csv",header=False, index=False)
-        # c = np.asarray(con_mat_norm)
-        # pd.DataFrame(c).to_csv(str(logpath)+"/confusion_matrix.csv",header=False, index=False)
+        con_matrix_i.reset_index(drop=False, names='label')
+        con_matrix = con_matrix_i
+
     elif type(config['TEST_SPLIT']) == int:
         print('Performing K-fold stratified cross validation with K=%s. The cross validation is done in the TEST set, '
-              'The train-validation split is done randomly. This is for better error estimation'
+              'The train-validation split is done randomly. This is for better error estimation. '
               'Results are given per fold' % config['TEST_SPLIT'])
-        x, y = ds._load_data(config['SAMPLES_PER_CLASS'], config['NOISE_RATIO'], locations_to_exclude=None)
+        x, y = ds.load_data(config['SAMPLES_PER_CLASS'], config['NOISE_RATIO'], locations_to_exclude=None)
         kfold = StratifiedKFold(n_splits=config['TEST_SPLIT'], shuffle=True)
         for fold, (train_index, test_index) in enumerate(kfold.split(x, y)):
             x_model = x[train_index]
@@ -213,32 +210,17 @@ def run_from_config(config, logpath=None):
                                                                   test_size=config['VALID_SPLIT'], shuffle=True)
 
             # Create and train the model
-            scores_i, con_mat_norm = create_train_and_test_model(logpath, ds.n_classes, x_train, y_train, x_valid,
-                                                                y_valid, x_test, y_test, config)
+            scores_i, con_matrix_i = create_train_and_test_model(logpath, ds.n_classes, x_train, y_train, x_valid,
+                                                                 y_valid, x_test, y_test, config,
+                                                                 categories=ds.int2class)
             scores.loc[len(scores)] = [fold, scores_i[0], scores_i[1]]
-            # if fold == 0:
-            #     s = np.asarray(scores)
-            #     c = np.asarray(con_mat_norm)
-            # elif fold != 0 and fold != config['TEST_SPLIT']-1:
-            #     s = s + np.asarray(scores)
-            #     c = c + np.asarray(con_mat_norm)
-            # elif fold == config['TEST_SPLIT']-1:
-            #     c = c + np.asarray(con_mat_norm)
-            #     s = s + np.asarray(scores)
-            #     c = np.asarray(c)/config['TEST_SPLIT']
-            #     s = np.asarray(s)/config['TEST_SPLIT']
-            #     pd.DataFrame(s).to_csv(str(logpath)+"/score_all.csv",header=False, index=False)
-            #     pd.DataFrame(c).to_csv(str(logpath)+"/confusion_matrix_all.csv",header=False, index=False)
-            #     cdf = pd.DataFrame(c, index=config[ "CATEGORIES_TO_JOIN"].keys(), columns=config[ "CATEGORIES_TO_JOIN"].keys())
-            #     plt.figure(figsize=(8, 8))
-            #     sns.heatmap(cdf, annot=True, cmap=plt.cm.Blues)
-            #     plt.tight_layout()
-            #     plt.ylabel('True label')
-            #     plt.xlabel('Predicted label')
-            #     plt.savefig(str(logpath)+'/confusion_matrix_all.png')
+            con_matrix_i.reset_index(drop=False, names='label')
+            con_matrix_i['fold'] = fold
+            con_matrix = pd.concat([con_matrix, con_matrix_i], ignore_index=True)
 
     else:
-        print('Performing blocked cross validation for each location (leave location out)')
+        print('Performing blocked cross validation for each location (leave location out). '
+              'Results are given per excluded location')
         for loc in config['LOCATIONS']:
             x_train, y_train, x_valid, y_valid, x_test, y_test = ds.load_blocked_dataset(valid_size=config[
                 'VALID_SPLIT'],
@@ -249,14 +231,14 @@ def run_from_config(config, logpath=None):
                                                                                          blocked_location=loc)
             # Create and train the model
             scores_i, con_mat_norm = create_train_and_test_model(logpath, ds.n_classes, x_train, y_train, x_valid,
-                                                                 y_valid, x_test, y_test, config)
+                                                                 y_valid, x_test, y_test, config,
+                                                                 categories=ds.int2class)
             scores.loc[len(scores)] = [loc, scores_i[0], scores_i[1]]
-        # s = np.asarray(scores)
-        # pd.DataFrame(s).to_csv(str(logpath)+"/score.csv",header=False, index=False)
-        # c = np.asarray(con_mat_norm)
-        # pd.DataFrame(c).to_csv(str(logpath)+"/confusion_matrix.csv",header=False, index=False)
-            
-    return scores
+            con_matrix_i = con_matrix_i.reset_index(drop=False, names='label')
+            con_matrix_i['excluded_loc'] = loc
+            con_matrix = pd.concat([con_matrix, con_matrix_i], ignore_index=True)
+
+    return scores, con_matrix
 
 
 # Press the green button in the gutter to run the script.
@@ -267,4 +249,3 @@ if __name__ == '__main__':
     f = open(config_file)
     config = json.load(f)
     run_from_config(config)
-

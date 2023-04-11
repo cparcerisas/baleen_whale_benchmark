@@ -28,6 +28,8 @@ Set to "blocked" for blocked testing. Each of the locations will be left out onc
 first n samples of each class. This is to avoid a non-real representation of a small dataset, usually users annotate a 
 certain period. If set to "all" it will take all the available ones
 * NOISE_RATIO: proportion of noise of the total dataset compared to the total number of calls
+* USE_CORRECTED_DATASET: bool, set to true to use the corrected dataset (only allows for 2500 samples per class!), 
+set to false otherwise
 
 ```json 
 {

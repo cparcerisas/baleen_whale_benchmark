@@ -14,7 +14,7 @@ if __name__ == '__main__':
     noise_results = pd.DataFrame()
     for noise in noise_to_check:
         config['NOISE_RATIO'] = noise/100
-        scores_df = training.run_from_config(config, logpath=pathlib.Path(config['OUTPUT_DIR']).joinpath('noise_%s' % noise))
+        scores_df, con_matrix = training.run_from_config(config, logpath=pathlib.Path(config['OUTPUT_DIR']).joinpath('noise_%s' % noise))
         scores_df['noise'] = noise
         noise_results = pd.concat([noise_results, scores_df])
 
