@@ -70,7 +70,7 @@ def train_model(model, x_train, y_train, x_valid, y_valid, batch_size, epochs):
     return model, history
 
 
-def test_model(model, x_test, y_test, categories, save_path):
+def test_model(model, x_test, y_test, categories):
     scores = model.evaluate(x_test, y_test, verbose=0)
     y_pred = model.predict(x_test)
     y_pred = np.argmax(y_pred, axis=1)
@@ -82,6 +82,10 @@ def test_model(model, x_test, y_test, categories, save_path):
 
     con_mat_df = pd.DataFrame(con_mat_norm, index=categories, columns=categories)
 
+    return scores, con_mat_df
+
+
+def plot_confusion_matrix(con_mat_df, save_path):
     plt.figure(figsize=(8, 8))
     ax = sns.heatmap(con_mat_df, annot=True, cmap=plt.cm.Blues)
     plt.tight_layout()
@@ -89,13 +93,11 @@ def test_model(model, x_test, y_test, categories, save_path):
     plt.xlabel('Predicted label')
     ax.xaxis.set_label_position('top')
     ax.xaxis.tick_top()
-    plt.savefig(save_path.joinpath('confusion_matrix.png'))
+    plt.savefig(save_path)
     plt.show()
 
-    return scores, con_mat_df
 
-
-def plot_training_metrics(history, save_path):
+def plot_training_metrics(history, save_path, fold):
     """
     Plot the history evolution of the metrics of the model
     :param history:
@@ -118,7 +120,7 @@ def plot_training_metrics(history, save_path):
     plt.xticks(np.arange(0, max(epoch_count), 2))
     # plt.text(10, 0.01, "Test acc: " + str(scores[1]))
     plt.grid()
-    plt.savefig(save_path.joinpath('fig1.png'))
+    plt.savefig(save_path.joinpath('training_accuracy_fold_%s.png' % fold))
     plt.show()
 
     plt.figure(figsize=(8, 8))
@@ -130,7 +132,7 @@ def plot_training_metrics(history, save_path):
     plt.yticks(np.arange(0, max(val_loss), 0.2))
     plt.xticks(np.arange(0, max(epoch_count), 2))
     plt.grid()
-    plt.savefig(save_path.joinpath('fig2.png'))
+    plt.savefig(save_path.joinpath('training_loss_fold_%s.png' % fold))
     plt.show()
 
     pass
@@ -138,7 +140,7 @@ def plot_training_metrics(history, save_path):
 
 def plot_test_predictions(test_ds, model):
     """
-    Plot the predictions made by the model in the test dataset, in folders depending if they are false positives,
+    Plot the predictions made by the model in the test dataset, in folders depending on if they are false positives,
     negatives or true positives or negatives
     :param test_ds:
     :param model:
@@ -148,15 +150,16 @@ def plot_test_predictions(test_ds, model):
 
 
 def create_train_and_test_model(logpath, n_classes, x_train, y_train, x_valid, y_valid, x_test, y_test,
-                                config, categories):
+                                config, categories, fold):
     cnn_model = create_model(logpath, n_classes=n_classes)
     cnn_model, history = train_model(cnn_model, x_train, y_train, x_valid, y_valid, config['BATCH_SIZE'],
                                      config['EPOCHS'])
 
-    plot_training_metrics(history, save_path=logpath)
-    scores_i, con_mat_norm = test_model(cnn_model, x_test=x_test, y_test=y_test, categories=categories,
-                                        save_path=logpath)
-    return scores_i, con_mat_norm
+    plot_training_metrics(history, save_path=logpath, fold=fold)
+    scores_i, con_mat_df = test_model(cnn_model, x_test=x_test, y_test=y_test, categories=categories)
+    plot_confusion_matrix(con_mat_df, logpath.joinpath('confusion_matrix_fold_%s.png' % fold))
+
+    return scores_i, con_mat_df
 
 
 def run_from_config(config, logpath=None):
@@ -190,10 +193,10 @@ def run_from_config(config, logpath=None):
                                                                                  noise_ratio=config['NOISE_RATIO'])
         # Create and train the model
         scores_i, con_matrix_i = create_train_and_test_model(logpath, ds.n_classes, x_train, y_train, x_valid, y_valid,
-                                                             x_test, y_test, config, categories=ds.int2class)
+                                                             x_test, y_test, config, categories=ds.int2class, fold=0)
+
         scores.loc[0] = ['random', scores_i[0], scores_i[1]]
-        con_matrix_i.reset_index(drop=False, names='label')
-        con_matrix = con_matrix_i
+        con_matrix = con_matrix_i.reset_index(drop=False, names='label')
 
     elif type(config['TEST_SPLIT']) == int:
         print('Performing K-fold stratified cross validation with K=%s. The cross validation is done in the TEST set, '
@@ -212,9 +215,9 @@ def run_from_config(config, logpath=None):
             # Create and train the model
             scores_i, con_matrix_i = create_train_and_test_model(logpath, ds.n_classes, x_train, y_train, x_valid,
                                                                  y_valid, x_test, y_test, config,
-                                                                 categories=ds.int2class)
+                                                                 categories=ds.int2class, fold=fold)
             scores.loc[len(scores)] = [fold, scores_i[0], scores_i[1]]
-            con_matrix_i.reset_index(drop=False, names='label')
+            con_matrix_i = con_matrix_i.reset_index(drop=False, names='label')
             con_matrix_i['fold'] = fold
             con_matrix = pd.concat([con_matrix, con_matrix_i], ignore_index=True)
 
@@ -223,7 +226,7 @@ def run_from_config(config, logpath=None):
               'Results are given per excluded location')
         for loc in config['LOCATIONS']:
             x_train, y_train, x_valid, y_valid, x_test, y_test = ds.load_blocked_dataset(valid_size=config[
-                'VALID_SPLIT'],
+                                                                                             'VALID_SPLIT'],
                                                                                          samples_per_class=config[
                                                                                              'SAMPLES_PER_CLASS'],
                                                                                          noise_ratio=config[
@@ -232,11 +235,13 @@ def run_from_config(config, logpath=None):
             # Create and train the model
             scores_i, con_mat_norm = create_train_and_test_model(logpath, ds.n_classes, x_train, y_train, x_valid,
                                                                  y_valid, x_test, y_test, config,
-                                                                 categories=ds.int2class)
+                                                                 categories=ds.int2class, fold=loc)
             scores.loc[len(scores)] = [loc, scores_i[0], scores_i[1]]
             con_matrix_i = con_matrix_i.reset_index(drop=False, names='label')
             con_matrix_i['excluded_loc'] = loc
             con_matrix = pd.concat([con_matrix, con_matrix_i], ignore_index=True)
+
+    con_matrix.to_csv(logpath.joinpath('total_confusion_matrix.csv'))
 
     return scores, con_matrix
 
