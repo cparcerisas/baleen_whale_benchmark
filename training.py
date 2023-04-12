@@ -242,6 +242,9 @@ def run_from_config(config, logpath=None):
             con_matrix = pd.concat([con_matrix, con_matrix_i], ignore_index=True)
 
     con_matrix.to_csv(logpath.joinpath('total_confusion_matrix.csv'))
+    con_matrix = con_matrix.drop(columns=['fold'])
+    con_matrix_avg = con_matrix.groupby('label').mean()
+    plot_confusion_matrix(con_matrix_avg, save_path=logpath.joinpath('mean_confusion_matrix.png'))
 
     return scores, con_matrix
 
