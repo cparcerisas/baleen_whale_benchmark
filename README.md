@@ -75,3 +75,18 @@ When running the training script, it will create an output folder with the curre
 All the running parameters will be stored there (a model_summary.txt file and a copy of the used config file) for 
 reproducibility. 
 
+There are 4 config files under the configs/ folder. These are the to use for each run. 
+For each test, run "training.py" for each of the configs and select a different folder as an output (in the config file)
+
+The output in the selected output folder will be: 
+* A folder for each fold/location excluded with the corresponding model saved there.
+  * There is a logs file in the model with the history of the accuracy and the loss
+* A copy of the config file used to run that output 
+* A model_summary.txt file with the model architecture
+* Plots
+  * A confusion matrix plot for each fold and noise percentage (if more than one)
+  * A plot of the training loss and training accuracy evolution during training, per fold
+* Results 
+  * A csv with total_confusion_matrix.csv with all the confusion matrixes of all the folds and noise percentages
+
+
