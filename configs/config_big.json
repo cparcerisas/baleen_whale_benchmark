@@ -1,0 +1,25 @@
+{
+  "DATA_DIR": "C:/Users/cleap/Documents/Data/Sound Data/cnn_and_noise",
+  "OUTPUT_DIR": "//fs/shared/onderzoek/6. Marine Observation Center/Projects/Side_Projects/Acoustics/CNN_vs_noise/",
+  "LOCATIONS": ["BallenyIsland", "Casey", "ElephantIsland", "SKerguelenPlateau", "Greenwich", "MaudRise"],
+  "CATEGORIES" : ["20Plus", "20Hz", "A", "B", "D", "Dswp", "Z", "Noise"],
+  "CATEGORIES_TO_JOIN": {
+                          "20Hz20Plus":  ["20Plus","20Hz"],
+                          "ABZ":  ["A","B", "Z"],
+                          "DDswp": ["D", "Dswp"]
+                        },
+  "SAMPLES_PER_CLASS": 200000,
+
+  "NOISE_RATIO": 0.3,
+  "USE_CORRECTED_DATASET": false,
+
+  "VALID_SPLIT": 0.3,
+  "TEST_SPLIT": 5,
+
+  "model_name": "IdilCNN",
+  "BATCH_SIZE": 32,
+  "EPOCHS": 1000,
+  "LEARNING_RATE": 1e-3,
+  "early_stop": 10,
+  "monitoring_metric": "val_accuracy"
+}
