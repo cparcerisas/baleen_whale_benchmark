@@ -56,7 +56,7 @@ Set to "blocked" for blocked testing. Each of the locations will be left out onc
   "SAMPLES_PER_CLASS": 250,
 
   "NOISE_RATIO": 0.5,
-  "NOISE_RATIO_TEST": [0.5, 0.6, 0.7, 0.
+  "NOISE_RATIO_TEST": [0.5, 0.6, 0.7, 0.8]
   "USE_CORRECTED_DATASET": true,
 
   "VALID_SPLIT": 0.3,
