@@ -87,6 +87,6 @@ The output in the selected output folder will be:
   * A confusion matrix plot for each fold and noise percentage (if more than one)
   * A plot of the training loss and training accuracy evolution during training, per fold
 * Results 
-  * A csv with total_confusion_matrix.csv with all the confusion matrixes of all the folds and noise percentages
+  * A csv with total_confusion_matrix.csv with all the confusion matrices of all the folds and noise percentages
 
 
