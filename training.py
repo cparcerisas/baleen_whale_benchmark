@@ -161,7 +161,7 @@ def create_and_train_model(logpath, n_classes, x_train, y_train, x_valid, y_vali
     return cnn_model
 
 
-def test_model(cnn_model, logpath, x_test, y_test, categories, fold):
+def test_model(cnn_model, logpath, x_test, y_test, categories, fold, noise_percentage):
     """
     Test the model
     :param cnn_model:
@@ -176,7 +176,7 @@ def test_model(cnn_model, logpath, x_test, y_test, categories, fold):
     :return:
     """
     scores_i, con_mat_df = get_model_scores(cnn_model, x_test=x_test, y_test=y_test, categories=categories)
-    plot_confusion_matrix(con_mat_df, logpath.joinpath('confusion_matrix_fold_%s.png' % fold))
+    plot_confusion_matrix(con_mat_df, logpath.joinpath('confusion_matrix_fold%s_noise%s.png' % (fold, noise_percentage)))
 
     return scores_i, con_mat_df
 
@@ -197,9 +197,9 @@ def create_train_and_test_model(logpath, n_classes, x_train, y_train, x_valid, y
     con_mat_df = pd.DataFrame()
     for noise in noise_to_test:
         x_test, y_test, paths_list = load_more_noise(x_test, y_test, paths_list, noise, config, ds)
-        scores_noise, con_mat_noise = test_model(cnn_model, logpath, x_test, y_test, categories, fold)
-        scores_noise['noise'] = noise
-        con_mat_noise['noise'] = noise
+        scores_noise, con_mat_noise = test_model(cnn_model, logpath, x_test, y_test, categories, fold, noise)
+        scores_noise['noise_percentage'] = noise
+        con_mat_noise['noise_percentage'] = noise
         scores_i = pd.concat([scores_i, scores_noise])
         con_mat_df = pd.concat([con_mat_df, con_mat_noise])
 
@@ -297,6 +297,7 @@ def run_from_config(config, logpath=None):
             con_matrix = pd.concat([con_matrix, con_matrix_i], ignore_index=True)
 
     con_matrix.to_csv(logpath.joinpath('total_confusion_matrix.csv'))
+    scores.to_csv(logpath.joinpath('total_scores.csv'))
     con_matrix = con_matrix.drop(columns=['fold'])
     con_matrix_avg = con_matrix.groupby('label').mean()
     plot_confusion_matrix(con_matrix_avg, save_path=logpath.joinpath('mean_confusion_matrix.png'))
