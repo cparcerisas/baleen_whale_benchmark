@@ -269,7 +269,6 @@ def run_from_config(config, logpath=None):
                                                                  y_valid, x_test, y_test, paths_list, config,
                                                                  categories=ds.int2class, fold=fold, ds=ds)
 
-            # scores.loc[len(scores)] = [fold, scores_i[0], scores_i[1]]
             scores_i['fold'] = fold
             scores = pd.concat([scores, scores_i], ignore_index=True)
             con_matrix_i = con_matrix_i.reset_index(drop=False, names='label')
@@ -291,8 +290,7 @@ def run_from_config(config, logpath=None):
             scores_i, con_mat_norm = create_train_and_test_model(logpath, ds.n_classes, x_train, y_train, x_valid,
                                                                  y_valid, x_test, y_test, paths_list, config,
                                                                  categories=ds.int2class, fold=loc, ds=ds)
-            # scores.loc[len(scores)] = [loc, scores_i[0], scores_i[1]]
-            scores_i['fold'] = fold
+            scores_i['fold'] = loc
             scores = pd.concat([scores, scores_i], ignore_index=True)
             con_matrix_i = con_matrix_i.reset_index(drop=False, names='label')
             con_matrix_i['excluded_loc'] = loc
