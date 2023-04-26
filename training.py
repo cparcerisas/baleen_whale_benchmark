@@ -24,6 +24,12 @@ CORRECTED_SAMPLES = 2500
 
 
 def create_model(logpath, n_classes):
+    """
+    Create the model. Stores a summary of the model in the logpath, called model_summary.txt
+    :param logpath: folder to store the logs
+    :param n_classes: number of classes
+    :return: created model
+    """
     model = tf.keras.models.Sequential()
     model.add(tf.keras.layers.Conv2D(32, kernel_size=(3, 3), activation='relu', padding="same",
                                      kernel_initializer='he_normal', input_shape=(IMAGE_WIDTH, IMAGE_HEIGHT, 1)))
@@ -61,6 +67,20 @@ def create_model(logpath, n_classes):
 
 def train_model(model, x_train, y_train, x_valid, y_valid, batch_size, epochs, early_stop, monitoring_metric,
                 model_logpath):
+    """
+    Train the model. Will store the logs of the training inside the folder model_logpath in a file called logs.csv
+    :param model: model created already
+    :param x_train: x to train
+    :param y_train: y to train
+    :param x_valid: x to validate
+    :param y_valid: y to validate
+    :param batch_size: batch size
+    :param epochs: number of epochs
+    :param early_stop: number of no increase performance to stop
+    :param monitoring_metric: string, metric to use to monitor performance
+    :param model_logpath: folder where to store the logs
+    :return: model, history
+    """
     opt = tf.keras.optimizers.Adam()
     METRICS = [
         keras.metrics.SparseCategoricalAccuracy(name='accuracy')
@@ -85,6 +105,14 @@ def train_model(model, x_train, y_train, x_valid, y_valid, batch_size, epochs, e
 
 
 def get_model_scores(model, x_test, y_test, categories):
+    """
+    Test the model on x_test and y_test.
+    :param model: tensorflow model
+    :param x_test: X
+    :param y_test: y
+    :param categories: names of the categories to create the confusion matrix
+    :return: scores_df (DataFrame) and con_mat_df (DataFrame)
+    """
     scores = model.evaluate(x_test, y_test, verbose=0)
     y_pred = model.predict(x_test)
     y_pred = np.argmax(y_pred, axis=1)
@@ -98,6 +126,12 @@ def get_model_scores(model, x_test, y_test, categories):
 
 
 def plot_confusion_matrix(con_mat_df, save_path):
+    """
+    Plot the confusion matrix and save it to save_path
+    :param con_mat_df: DataFramem, output from get_model_scores
+    :param save_path: str or path
+    :return:
+    """
     plt.figure(figsize=(8, 8))
     ax = sns.heatmap(con_mat_df, annot=True, cmap=plt.cm.Blues)
     plt.tight_layout()
@@ -111,9 +145,12 @@ def plot_confusion_matrix(con_mat_df, save_path):
 
 def plot_training_metrics(history, save_path, fold):
     """
-    Plot the history evolution of the metrics of the model
-    :param history:
-    :param save_path:
+    Plot the history evolution of the metrics of the model and store the images in the folder save_path with the
+    correct name indicating which fold was it run
+
+    :param history: history, output from tensorflow
+    :param save_path: folder path to store the training evolution metrics
+    :param fold: which fold was it run on
     :return:
     """
     training_acc = history.history['accuracy']
@@ -151,6 +188,19 @@ def plot_training_metrics(history, save_path, fold):
 
 
 def create_and_train_model(logpath, n_classes, x_train, y_train, x_valid, y_valid, config, fold):
+    """
+    Create and train model, from config
+
+    :param logpath:
+    :param n_classes:
+    :param x_train:
+    :param y_train:
+    :param x_valid:
+    :param y_valid:
+    :param config:
+    :param fold:
+    :return:
+    """
     cnn_model = create_model(logpath, n_classes=n_classes)
     model_logpath = logpath.joinpath('fold%s' % fold)
     cnn_model, history = train_model(cnn_model, x_train, y_train, x_valid, y_valid, config['BATCH_SIZE'],
@@ -217,6 +267,14 @@ def load_more_noise(x_test, y_test, paths_list, noise, config, ds):
 
 
 def run_from_config(config, logpath=None):
+    """
+    Run a train, test set according to config. The output will be saved on the logpath folder.
+    To see the structure of the output folder, check the README.
+
+    :param config:
+    :param logpath:
+    :return:
+    """
     tf.random.set_seed(42)
 
     if config['USE_CORRECTED_DATASET'] and config['SAMPLES_PER_CLASS'] > CORRECTED_SAMPLES:
