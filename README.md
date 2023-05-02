@@ -2,6 +2,14 @@
 
 Here the code necessary to run the figures for the paper. 
 
+## How should the data be organized 
+Data should be one folder, with one subfolder per each original class (not joined class). 
+In the main folder, next to the subfolders, a csv file per original class with all the samples wrongly classified
+(only necessary if corrected dataset wants to be used)
+
+Inside the subfolders, the files should be: n_locationyear_class, where n is the detection number of that particular 
+location-year combination. locationyear is the location and the year of the deployment and class is the label of the image. 
+For example: 1_BallenyIsland2015_20Hz
 
 ## How to run it 
 All the parameters have to be defined in a config file config.json and then the training.py script can be executed
