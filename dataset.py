@@ -15,7 +15,21 @@ SHUFFLE_SEED = 43
 
 
 class SpectrogramDataSet:
-    def __init__(self, data_dir, image_width, image_height, categories, join_cat, locations, n_channels, corrected):
+    def __init__(self, data_dir, image_width, image_height, categories, join_cat, locations, n_channels, corrected,
+                 samples_per_class='all'):
+        """
+
+        :param data_dir:
+        :param image_width:
+        :param image_height:
+        :param categories:
+        :param join_cat:
+        :param locations:
+        :param n_channels:
+        :param corrected:
+        :param samples_per_class: int, number of samples per class
+
+        """
         self.locations = locations
         self.data_dir = data_dir
         self.image_height = image_height
@@ -24,6 +38,7 @@ class SpectrogramDataSet:
         self.categories = categories
         self.corrected = corrected
         self.join_cat = join_cat
+        self.samples_per_class = samples_per_class
 
         # Create an understandable map for joined categories
         # and their corresponding int representation
@@ -46,6 +61,21 @@ class SpectrogramDataSet:
         print('These are the classes: ', self.classes2int)
         print('Which are formed by doing: ', self.map_join)
 
+    def how_many_samples(self):
+        """
+        Return the number of samples if all is selected
+        :return:
+        """
+        samples = 0
+        for cat_i, category in enumerate(self.categories):
+            # If Noise, select a random amount
+            if category != 'Noise':
+                path = os.path.join(self.data_dir, category)
+
+                # Read all the images of that category
+                samples += len(pd.Series(os.listdir(path)))
+        return samples / (len(self.categories) - 1)
+
     def reshape_images(self, images):
         """
         Reshape all the images to the specified height, width and channels during init of object
@@ -57,13 +87,12 @@ class SpectrogramDataSet:
         x = X / 255.0
         return x
 
-    def load_data(self, samples_per_class, noise_ratio, locations_to_exclude=None):
+    def load_data(self, noise_ratio, locations_to_exclude=None):
         """
         The function will return the selected data for all the classes together, shuffled.
         For non-noise classes, the data included will be the first samples_per_class of the dataset (ordered),
         excluding the ones corresponding to the locations to exclude, if any.
 
-        :param samples_per_class: int, number of samples per class
         :param noise_ratio: float (0 to 1), ratio of noise of the total dataset.
         :param locations_to_exclude: list of locations to not load (for blocked testing)
         :return: x, y and paths
@@ -76,10 +105,11 @@ class SpectrogramDataSet:
         for cat_i, category in enumerate(self.categories):
             # If Noise, select a random amount
             if category == 'Noise':
-                samples_per_class = self.get_noise_samples(samples_per_class, noise_ratio)
-
+                samples_to_load = self.get_noise_samples(noise_ratio)
+            else:
+                samples_to_load = self.samples_per_class
             # Add the data from that category
-            images, labels, paths_list = self.load_data_category(category, samples_per_class, locations_to_exclude)
+            images, labels, paths_list = self.load_data_category(category, samples_to_load, locations_to_exclude)
             total_images += images
             total_labels += labels
             total_paths += paths_list
@@ -90,16 +120,16 @@ class SpectrogramDataSet:
 
         return x, y, total_paths
 
-    def load_data_category(self, category, samples_per_class, locations_to_exclude=None,
+    def load_data_category(self, category, samples_to_load, locations_to_exclude=None,
                            samples_to_exclude=None):
         """
         The function will return the selected data.
-        For non-noise classes, the data included will be the first samples_per_class of the dataset (ordered),
+        For non-noise classes, the data included will be the first samples_to_load of the dataset (ordered),
         excluding the ones listed in samples_to_exclude and the ones corresponding to the locations to exclude,
         if any.
 
         :param category: string, category to load
-        :param samples_per_class: int, number of samples per class
+        :param samples_to_load: int, number of samples per class
         :param locations_to_exclude:
         :param samples_to_exclude:
         :return:
@@ -123,14 +153,14 @@ class SpectrogramDataSet:
         # If the dataset is corrected, exclude the corrections
         joined_cat = self.map_join[category]
 
-        if samples_per_class == 'all':
+        if samples_to_load == 'all':
             last_img = -1
         else:
             # Sort the images, we only want the n first ones
             order = all_images.str.split('_', expand=True)[0].astype(int)
             order = order.sort_values()
             all_images = all_images.reindex(order.index)
-            last_img = min(len(all_images), int(samples_per_class))
+            last_img = min(len(all_images), int(samples_to_load))
 
         selected_images = all_images.iloc[:last_img]
         # If using the corrected dataset, eliminate the ones that are not correct
@@ -157,7 +187,7 @@ class SpectrogramDataSet:
 
         return images, labels, paths_list
 
-    def load_all_dataset(self, test_size, valid_size, samples_per_class, noise_ratio):
+    def load_all_dataset(self, test_size, valid_size, noise_ratio):
         """
         Will load all the labeled data (up to samples_per_class for each class)
         and some noise samples up to a certain noise_ratio
@@ -165,52 +195,47 @@ class SpectrogramDataSet:
         :param test_size: float (0 to 1), percentage from the total data loaded to split randomly to test
         :param valid_size: float (0 to 1), percentage from the model (not test) data loaded to split randomly to
         validation
-        :param samples_per_class: int, number of samples per class
         :param noise_ratio: float (0 to 1), ratio of noise of the total dataset.
         :return: x_train, y_train, x_valid, y_valid, x_test, y_test, paths_list (of all the data)
         """
-        x, y, paths_list = self.load_data(locations_to_exclude=None, samples_per_class=samples_per_class,
+        x, y, paths_list = self.load_data(locations_to_exclude=None,
                                           noise_ratio=noise_ratio)
         x_model, x_test, y_model, y_test = train_test_split(x, y, test_size=test_size, shuffle=True)
         x_train, x_valid, y_train, y_valid = train_test_split(x_model, y_model, test_size=valid_size, shuffle=True)
         return x_train, y_train, x_valid, y_valid, x_test, y_test, paths_list
 
-    def load_blocked_dataset(self, blocked_location, valid_size, samples_per_class, noise_ratio):
+    def load_blocked_dataset(self, blocked_location, valid_size, noise_ratio):
         """
         Same than load_all_dataset but the test is decided by the blocked location
         :param blocked_location: string, name of the location to use for test and NOT for training or validation
         :param valid_size: float (0 to 1), percentage from the model (not test) data loaded to split randomly to
         validation
-        :param samples_per_class: int, number of samples per class
         :param noise_ratio: float (0 to 1), ratio of noise of the total dataset.
         :return: x_train, y_train, x_valid, y_valid, x_test, y_test, paths_list (of all the data)
         """
         selected_locs = list(set(self.locations) - {blocked_location})
         x, y, paths_list_model = self.load_data(locations_to_exclude=[blocked_location],
-                                                samples_per_class=samples_per_class,
                                                 noise_ratio=noise_ratio)
         x_train, x_valid, y_train, y_valid = train_test_split(x, y, test_size=valid_size, shuffle=True)
 
         x_test, y_test, paths_list_test = self.load_data(locations_to_exclude=selected_locs,
-                                                         samples_per_class=samples_per_class, noise_ratio=noise_ratio)
+                                                         noise_ratio=noise_ratio)
 
         paths_list = paths_list_model + paths_list_test
         return x_train, y_train, x_valid, y_valid, x_test, y_test, paths_list
 
-    def folds(self, samples_per_class, noise_ratio, n_folds, valid_size):
+    def folds(self, noise_ratio, n_folds, valid_size):
         """
         Loop through the folds. The data will be first loaded (x, y) according to the samples per class and noise ratio.
         Once the data is loaded, it will be split between model and test according to the folds.
         Inside every fold, model split is split further into train and test, but this time randomly.
 
-        :param samples_per_class: int, number of samples per class
         :param noise_ratio: float (0 to 1), ratio of noise of the total dataset.
         :param n_folds: number of folds to loop through
         :param valid_size: float (0 to 1) validation split from the model split
         :return: fold, x_train, y_train, x_vali, y_valid, x_test, y_test, paths_list (for all together)
         """
-        x, y, paths_list = self.load_data(samples_per_class,
-                                          noise_ratio=noise_ratio,
+        x, y, paths_list = self.load_data(noise_ratio=noise_ratio,
                                           locations_to_exclude=None)
         kfold = StratifiedKFold(n_splits=n_folds, shuffle=True)
         for fold, (train_index, test_index) in enumerate(kfold.split(x, y)):
@@ -222,7 +247,7 @@ class SpectrogramDataSet:
                                                                   test_size=valid_size, shuffle=True)
             yield fold, x_train, y_train, x_valid, y_valid, x_test, y_test, paths_list
 
-    def load_more_noise(self, x_test, y_test, paths_list, new_noise_ratio, samples_per_class):
+    def load_more_noise(self, x_test, y_test, paths_list, new_noise_ratio):
         """
         Append to x_test and y_test more noise, NOT repeated (not the same samples).
         The amount of noise added is according to the new_noise_ratio.
@@ -231,12 +256,12 @@ class SpectrogramDataSet:
         :param y_test: existing y_test
         :param paths_list: paths of the images corresponding to x_test and y_test
         :param new_noise_ratio: new ratio (0 to 1) of noise from the total dataset
-        :param samples_per_class: number of samples per class
         :return: updated x_test and y_test
         """
-        noise_samples = self.get_noise_samples(samples_per_class, new_noise_ratio)
+        noise_samples = self.get_noise_samples(new_noise_ratio)
         new_noise_samples = noise_samples - (y_test == self.classes2int['Noise']).sum()
-        images, labels, new_paths_list = self.load_data_category('Noise', new_noise_samples, locations_to_exclude=None,
+        images, labels, new_paths_list = self.load_data_category('Noise', samples_to_load=new_noise_samples,
+                                                                 locations_to_exclude=None,
                                                                  samples_to_exclude=paths_list)
 
         new_x = self.reshape_images(images)
@@ -249,13 +274,16 @@ class SpectrogramDataSet:
 
         return x, y, paths_list
 
-    def get_noise_samples(self, samples_per_class, noise_ratio):
+    def get_noise_samples(self, noise_ratio):
         """
         Compute how many noise samples are necessary to get the specified noise_ratio if each class has an amount of
         samples of samples_per_class
 
-        :param samples_per_class: int, number of samples per class
         :param noise_ratio: float (0 to 1), ratio of noise of the total dataset.
         :return: number of samples
         """
+        if self.samples_per_class == 'all':
+            samples_per_class = self.how_many_samples()
+        else:
+            samples_per_class = self.samples_per_class
         return ((len(self.categories) - 1) * samples_per_class * noise_ratio) / (1 - noise_ratio)

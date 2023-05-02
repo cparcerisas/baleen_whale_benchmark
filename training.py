@@ -258,8 +258,7 @@ def create_train_and_test_model(logpath, n_classes, x_train, y_train, x_valid, y
 
 def load_more_noise(x_test, y_test, paths_list, noise, config, ds):
     if noise > config['NOISE_RATIO']:
-        x_test, y_test, paths_list = ds.load_more_noise(x_test, y_test, paths_list,
-                                                        noise, config['SAMPLES_PER_CLASS'])
+        x_test, y_test, paths_list = ds.load_more_noise(x_test, y_test, paths_list, noise)
     else:
         print('Noise percentage lower than in training. Not considering it and testing on the trained ratio')
 
@@ -287,13 +286,15 @@ def run_from_config(config, logpath=None):
         logpath = pathlib.Path(config['OUTPUT_DIR']).joinpath(now_time.strftime('%y%m%d_%H%M%S'))
     if not logpath.exists():
         os.mkdir(str(logpath))
+
     json.dump(config, open(logpath.joinpath('config.json'), mode='a'))
 
     # Load the dataset
     ds = dataset.SpectrogramDataSet(data_dir=config['DATA_DIR'], image_width=IMAGE_WIDTH, image_height=IMAGE_HEIGHT,
                                     categories=config['CATEGORIES'], join_cat=config["CATEGORIES_TO_JOIN"],
                                     locations=config['LOCATIONS'], n_channels=N_CHANNELS,
-                                    corrected=config['USE_CORRECTED_DATASET'])
+                                    corrected=config['USE_CORRECTED_DATASET'],
+                                    samples_per_class=config['SAMPLES_PER_CLASS'])
     scores = pd.DataFrame()
     con_matrix = pd.DataFrame()
     if type(config['TEST_SPLIT']) == float:
@@ -301,8 +302,7 @@ def run_from_config(config, logpath=None):
         x_train, y_train, x_valid, y_valid, x_test, y_test, paths_list = ds.load_all_dataset(
             test_size=config['TEST_SPLIT'],
             valid_size=config['VALID_SPLIT'],
-            samples_per_class=config[
-                'SAMPLES_PER_CLASS'],
+
             noise_ratio=config[
                 'NOISE_RATIO'])
         # Create and train the model
@@ -320,8 +320,7 @@ def run_from_config(config, logpath=None):
               'the train-validation split is done randomly. This is for better error estimation. '
               'Results are given per fold' % config['TEST_SPLIT'])
         for fold, x_train, y_train, x_valid, y_valid, x_test, y_test, paths_list in ds.folds(
-                    samples_per_class=config['SAMPLES_PER_CLASS'], noise_ratio=config['NOISE_RATIO'],
-                    n_folds=config['TEST_SPLIT'], valid_size=config['VALID_SPLIT']):
+                    noise_ratio=config['NOISE_RATIO'], n_folds=config['TEST_SPLIT'], valid_size=config['VALID_SPLIT']):
             # Create and train the model
             scores_i, con_matrix_i = create_train_and_test_model(logpath, ds.n_classes, x_train, y_train, x_valid,
                                                                  y_valid, x_test, y_test, paths_list, config,
@@ -339,8 +338,6 @@ def run_from_config(config, logpath=None):
         for loc in config['LOCATIONS']:
             x_train, y_train, x_valid, y_valid, x_test, y_test, paths_list = ds.load_blocked_dataset(valid_size=config[
                                                                                              'VALID_SPLIT'],
-                                                                                         samples_per_class=config[
-                                                                                             'SAMPLES_PER_CLASS'],
                                                                                          noise_ratio=config[
                                                                                              'NOISE_RATIO'],
                                                                                          blocked_location=loc)
