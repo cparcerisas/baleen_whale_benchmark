@@ -123,14 +123,6 @@ class SpectrogramDataSet:
         # If the dataset is corrected, exclude the corrections
         joined_cat = self.map_join[category]
 
-        # If using the corrected dataset, eliminate the ones that are not correct
-        if self.corrected:
-            correction_path = os.path.join(self.data_dir, category + '2Noise.csv')
-            if os.path.exists(correction_path):
-                correction_csv = pd.read_csv(correction_path, header=None)
-                all_images_joined_names = all_images.str.split('_').str.join('')
-                all_images = all_images.loc[~all_images_joined_names.isin(correction_csv[0])]
-
         if samples_per_class == 'all':
             last_img = -1
         else:
@@ -141,6 +133,16 @@ class SpectrogramDataSet:
             last_img = min(len(all_images), int(samples_per_class))
 
         selected_images = all_images.iloc[:last_img]
+        # If using the corrected dataset, eliminate the ones that are not correct
+        if self.corrected and category != 'Noise':
+            correction_path = os.path.join(self.data_dir, category + '2Noise.csv')
+            if not os.path.exists(correction_path):
+                raise Exception('If you want to use the corrected dataset you should provide a csv file with the '
+                                'corrections for each of the original classes')
+            correction_csv = pd.read_csv(correction_path, header=None)
+            all_images_joined_names = selected_images.str.split('_').str.join('')
+            selected_images = selected_images.loc[~all_images_joined_names.isin(correction_csv[0])]
+
         for img_path in selected_images:
             img_array = cv2.imread(os.path.join(path, img_path))
 
