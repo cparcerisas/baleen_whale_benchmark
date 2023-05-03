@@ -200,8 +200,15 @@ class SpectrogramDataSet:
         """
         x, y, paths_list = self.load_data(locations_to_exclude=None,
                                           noise_ratio=noise_ratio)
-        x_model, x_test, y_model, y_test = train_test_split(x, y, test_size=test_size, shuffle=True)
-        x_train, x_valid, y_train, y_valid = train_test_split(x_model, y_model, test_size=valid_size, shuffle=True)
+        paths_df = pd.DataFrame({'path': paths_list})
+        x_model, x_test, y_model, y_test, paths_model, paths_test = train_test_split(x, y, paths_df,
+                                                                                     test_size=test_size, shuffle=True)
+        x_train, x_valid, y_train, y_valid, paths_train, paths_valid = train_test_split(x_model, y_model, paths_model,
+                                                                                        test_size=valid_size,
+                                                                                        shuffle=True)
+        paths_df['set']
+        paths_df.loc[paths_test.index, 'set'] = 'test'
+
         return x_train, y_train, x_valid, y_valid, x_test, y_test, paths_list
 
     def load_blocked_dataset(self, blocked_location, valid_size, noise_ratio):
@@ -216,13 +223,21 @@ class SpectrogramDataSet:
         selected_locs = list(set(self.locations) - {blocked_location})
         x, y, paths_list_model = self.load_data(locations_to_exclude=[blocked_location],
                                                 noise_ratio=noise_ratio)
-        x_train, x_valid, y_train, y_valid = train_test_split(x, y, test_size=valid_size, shuffle=True)
+        paths_model_df = pd.DataFrame({'path': paths_list_model})
+        x_train, x_valid, y_train, y_valid, paths_df_train, paths_df_valid = train_test_split(x, y,
+                                                                                              paths_model_df,
+                                                                                              test_size=valid_size,
+                                                                                              shuffle=True)
+        paths_model_df['set'] = None
+        paths_model_df.loc[paths_df_train.index, 'set'] = 'train'
+        paths_model_df.loc[paths_df_valid.index, 'set'] = 'valid'
 
         x_test, y_test, paths_list_test = self.load_data(locations_to_exclude=selected_locs,
                                                          noise_ratio=noise_ratio)
-
-        paths_list = paths_list_model + paths_list_test
-        return x_train, y_train, x_valid, y_valid, x_test, y_test, paths_list
+        paths_test_df = pd.DataFrame({'path': paths_list_test})
+        paths_test_df = paths_test_df.assign(set='test')
+        paths_list_df = pd.concat([paths_model_df, paths_test_df])
+        return x_train, y_train, x_valid, y_valid, x_test, y_test, paths_list_df
 
     def folds(self, noise_ratio, n_folds, valid_size):
         """
@@ -238,23 +253,33 @@ class SpectrogramDataSet:
         x, y, paths_list = self.load_data(noise_ratio=noise_ratio,
                                           locations_to_exclude=None)
         kfold = StratifiedKFold(n_splits=n_folds, shuffle=True)
+
         for fold, (train_index, test_index) in enumerate(kfold.split(x, y)):
+            paths_df = pd.DataFrame({'path': paths_list})
+            paths_df['set'] = None
             x_model = x[train_index]
             y_model = y[train_index]
             x_test = x[test_index]
             y_test = y[test_index]
-            x_train, x_valid, y_train, y_valid = train_test_split(x_model, y_model,
-                                                                  test_size=valid_size, shuffle=True)
-            yield fold, x_train, y_train, x_valid, y_valid, x_test, y_test, paths_list
 
-    def load_more_noise(self, x_test, y_test, paths_list, new_noise_ratio):
+            x_train, x_valid, y_train, y_valid, paths_df_train, paths_df_valid = train_test_split(x_model,
+                                                                                                  y_model, paths_df.loc[
+                                                                                                      train_index],
+                                                                                                  test_size=valid_size,
+                                                                                                  shuffle=True)
+            paths_df.loc[test_index, 'set'] = 'test'
+            paths_df.loc[paths_df_train.index, 'set'] = 'train'
+            paths_df.loc[paths_df_valid.index, 'set'] = 'valid'
+            yield fold, x_train, y_train, x_valid, y_valid, x_test, y_test, paths_df
+
+    def load_more_noise(self, x_test, y_test, paths_df, new_noise_ratio):
         """
         Append to x_test and y_test more noise, NOT repeated (not the same samples).
         The amount of noise added is according to the new_noise_ratio.
 
         :param x_test: existing x_test
         :param y_test: existing y_test
-        :param paths_list: paths of the images corresponding to x_test and y_test
+        :param paths_df: pd.DataFrame with all the paths of the images corresponding used
         :param new_noise_ratio: new ratio (0 to 1) of noise from the total dataset
         :return: updated x_test and y_test
         """
@@ -262,7 +287,7 @@ class SpectrogramDataSet:
         new_noise_samples = noise_samples - (y_test == self.classes2int['Noise']).sum()
         images, labels, new_paths_list = self.load_data_category('Noise', samples_to_load=new_noise_samples,
                                                                  locations_to_exclude=None,
-                                                                 samples_to_exclude=paths_list)
+                                                                 samples_to_exclude=paths_df['path'].values)
 
         new_x = self.reshape_images(images)
         new_y = np.array(labels)
@@ -270,9 +295,12 @@ class SpectrogramDataSet:
         x = np.concatenate([x_test, new_x])
         y = np.concatenate([y_test, new_y])
 
-        paths_list += new_paths_list
+        new_paths_df = pd.DataFrame({'path': new_paths_list})
+        new_paths_df['set'] = 'test'
 
-        return x, y, paths_list
+        paths_df = pd.concat([paths_df, new_paths_df])
+
+        return x, y, paths_df
 
     def get_noise_samples(self, noise_ratio):
         """

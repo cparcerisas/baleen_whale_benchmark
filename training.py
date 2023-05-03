@@ -187,7 +187,7 @@ def plot_training_metrics(history, save_path, fold):
     pass
 
 
-def create_and_train_model(logpath, n_classes, x_train, y_train, x_valid, y_valid, config, fold):
+def create_and_train_model(logpath, n_classes, x_train, y_train, x_valid, y_valid, paths_list, config, fold):
     """
     Create and train model, from config
 
@@ -197,12 +197,16 @@ def create_and_train_model(logpath, n_classes, x_train, y_train, x_valid, y_vali
     :param y_train:
     :param x_valid:
     :param y_valid:
+    :param paths_list: df with all the paths used and which set they were used in
     :param config:
     :param fold:
     :return:
     """
     cnn_model = create_model(logpath, n_classes=n_classes)
     model_logpath = logpath.joinpath('fold%s' % fold)
+    if not model_logpath.exists():
+        os.mkdir(model_logpath)
+    paths_list.to_csv(model_logpath.joinpath('data_used.csv'))
     cnn_model, history = train_model(cnn_model, x_train, y_train, x_valid, y_valid, config['BATCH_SIZE'],
                                      config['EPOCHS'], config['early_stop'], config['monitoring_metric'],
                                      model_logpath=model_logpath)
@@ -236,7 +240,7 @@ def create_train_and_test_model(logpath, n_classes, x_train, y_train, x_valid, y
     """
     Create the model, train it and test it according to the specifications in config
     """
-    cnn_model = create_and_train_model(logpath, n_classes, x_train, y_train, x_valid, y_valid, config, fold)
+    cnn_model = create_and_train_model(logpath, n_classes, x_train, y_train, x_valid, y_valid, paths_list, config, fold)
 
     if type(config['NOISE_RATIO_TEST']) == list:
         noise_to_test = config['NOISE_RATIO_TEST']
