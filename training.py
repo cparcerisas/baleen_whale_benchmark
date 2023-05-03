@@ -205,9 +205,6 @@ def create_and_train_model(log_path, n_classes, x_train, y_train, x_valid, y_val
     """
     cnn_model = create_model(log_path, n_classes=n_classes)
     model_log_path = log_path.joinpath('fold%s' % fold)
-    if not model_log_path.exists():
-        os.mkdir(model_log_path)
-    paths_list.to_csv(model_log_path.joinpath('data_used.csv'))
     cnn_model, history = train_model(cnn_model, x_train, y_train, x_valid, y_valid, config['BATCH_SIZE'],
                                      config['EPOCHS'], config['early_stop'], config['monitoring_metric'],
                                      model_log_path=model_log_path)
@@ -216,17 +213,19 @@ def create_and_train_model(log_path, n_classes, x_train, y_train, x_valid, y_val
     return cnn_model
 
 
-def test_model(cnn_model, log_path, x_test, y_test, categories, fold, noise_percentage):
+def test_model(cnn_model, log_path, x_test, y_test, categories, fold, noise_percentage, paths_list):
     """
     Test the model
     :param cnn_model:
     :param log_path:
     :param x_test:
     :param y_test:
+    :param paths_list: df with all the paths used
     :param categories:
     :param fold:
     :return:
     """
+    paths_list.to_csv(log_path.joinpath('data_used_fold%s_noise%s.csv' % (fold, noise_percentage)))
     scores_i, con_mat_df = get_model_scores(cnn_model, x_test=x_test, y_test=y_test, categories=categories)
     plot_confusion_matrix(con_mat_df, log_path.joinpath('confusion_matrix_fold%s_noise%s.png' %
                                                         (fold, noise_percentage)))
@@ -251,11 +250,13 @@ def create_train_and_test_model(log_path, n_classes, x_train, y_train, x_valid, 
     con_mat_df = pd.DataFrame()
     for noise in noise_to_test:
         x_test, y_test, paths_list = load_more_noise(x_test, y_test, paths_list, noise, config, ds)
-        scores_noise, con_mat_noise = test_model(cnn_model, log_path, x_test, y_test, categories, fold, noise)
+        scores_noise, con_mat_noise = test_model(cnn_model, log_path, x_test, y_test, categories, fold, noise,
+                                                 paths_list)
         scores_noise['noise_percentage'] = noise
         con_mat_noise['noise_percentage'] = noise
         scores_i = pd.concat([scores_i, scores_noise])
         con_mat_df = pd.concat([con_mat_df, con_mat_noise])
+
 
     return scores_i, con_mat_df
 
