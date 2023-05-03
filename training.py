@@ -23,10 +23,10 @@ N_CHANNELS = 1
 CORRECTED_SAMPLES = 2500
 
 
-def create_model(logpath, n_classes):
+def create_model(log_path, n_classes):
     """
-    Create the model. Stores a summary of the model in the logpath, called model_summary.txt
-    :param logpath: folder to store the logs
+    Create the model. Stores a summary of the model in the log_path, called model_summary.txt
+    :param log_path: folder to store the logs
     :param n_classes: number of classes
     :return: created model
     """
@@ -56,7 +56,7 @@ def create_model(logpath, n_classes):
     model.add(tf.keras.layers.Dropout(0.3))
     model.add(tf.keras.layers.Dense(n_classes, activation='softmax'))
 
-    model_summary_path = logpath.joinpath('model_summary.txt')
+    model_summary_path = log_path.joinpath('model_summary.txt')
     # Open the file
     with open(model_summary_path, 'w') as fh:
         # Pass the file handle in as a lambda function to make it callable
@@ -66,9 +66,9 @@ def create_model(logpath, n_classes):
 
 
 def train_model(model, x_train, y_train, x_valid, y_valid, batch_size, epochs, early_stop, monitoring_metric,
-                model_logpath):
+                model_log_path):
     """
-    Train the model. Will store the logs of the training inside the folder model_logpath in a file called logs.csv
+    Train the model. Will store the logs of the training inside the folder model_log_path in a file called logs.csv
     :param model: model created already
     :param x_train: x to train
     :param y_train: y to train
@@ -78,7 +78,7 @@ def train_model(model, x_train, y_train, x_valid, y_valid, batch_size, epochs, e
     :param epochs: number of epochs
     :param early_stop: number of no increase performance to stop
     :param monitoring_metric: string, metric to use to monitor performance
-    :param model_logpath: folder where to store the logs
+    :param model_log_path: folder where to store the logs
     :return: model, history
     """
     opt = tf.keras.optimizers.Adam()
@@ -90,16 +90,16 @@ def train_model(model, x_train, y_train, x_valid, y_valid, batch_size, epochs, e
                   optimizer=opt,
                   metrics=METRICS)
 
-    model_save_filename = model_logpath.joinpath('checkpoints')
+    model_save_filename = model_log_path.joinpath('checkpoints')
 
-    earlystopping_cb = keras.callbacks.EarlyStopping(patience=early_stop, restore_best_weights=True)
-    mdlcheckpoint_cb = keras.callbacks.ModelCheckpoint(
+    early_stopping_cb = keras.callbacks.EarlyStopping(patience=early_stop, restore_best_weights=True)
+    mdl_checkpoint_cb = keras.callbacks.ModelCheckpoint(
         model_save_filename, save_weights_only=True, monitor=monitoring_metric, save_best_only=True
     )
-    history_cb = tf.keras.callbacks.CSVLogger(model_logpath.joinpath('logs.csv'), separator=',', append=False)
+    history_cb = tf.keras.callbacks.CSVLogger(model_log_path.joinpath('logs.csv'), separator=',', append=False)
 
     history = model.fit(x_train, y_train, batch_size=batch_size, epochs=epochs, validation_data=(x_valid, y_valid),
-                        callbacks=[earlystopping_cb, mdlcheckpoint_cb, history_cb])
+                        callbacks=[early_stopping_cb, mdl_checkpoint_cb, history_cb])
 
     return model, history
 
@@ -107,6 +107,7 @@ def train_model(model, x_train, y_train, x_valid, y_valid, batch_size, epochs, e
 def get_model_scores(model, x_test, y_test, categories):
     """
     Test the model on x_test and y_test.
+
     :param model: tensorflow model
     :param x_test: X
     :param y_test: y
@@ -187,11 +188,11 @@ def plot_training_metrics(history, save_path, fold):
     pass
 
 
-def create_and_train_model(logpath, n_classes, x_train, y_train, x_valid, y_valid, paths_list, config, fold):
+def create_and_train_model(log_path, n_classes, x_train, y_train, x_valid, y_valid, paths_list, config, fold):
     """
     Create and train model, from config
 
-    :param logpath:
+    :param log_path:
     :param n_classes:
     :param x_train:
     :param y_train:
@@ -202,45 +203,44 @@ def create_and_train_model(logpath, n_classes, x_train, y_train, x_valid, y_vali
     :param fold:
     :return:
     """
-    cnn_model = create_model(logpath, n_classes=n_classes)
-    model_logpath = logpath.joinpath('fold%s' % fold)
-    if not model_logpath.exists():
-        os.mkdir(model_logpath)
-    paths_list.to_csv(model_logpath.joinpath('data_used.csv'))
+    cnn_model = create_model(log_path, n_classes=n_classes)
+    model_log_path = log_path.joinpath('fold%s' % fold)
+    if not model_log_path.exists():
+        os.mkdir(model_log_path)
+    paths_list.to_csv(model_log_path.joinpath('data_used.csv'))
     cnn_model, history = train_model(cnn_model, x_train, y_train, x_valid, y_valid, config['BATCH_SIZE'],
                                      config['EPOCHS'], config['early_stop'], config['monitoring_metric'],
-                                     model_logpath=model_logpath)
-    cnn_model.save(model_logpath.joinpath('model'))
-    plot_training_metrics(history, save_path=logpath, fold=fold)
+                                     model_log_path=model_log_path)
+    cnn_model.save(model_log_path.joinpath('model'))
+    plot_training_metrics(history, save_path=log_path, fold=fold)
     return cnn_model
 
 
-def test_model(cnn_model, logpath, x_test, y_test, categories, fold, noise_percentage):
+def test_model(cnn_model, log_path, x_test, y_test, categories, fold, noise_percentage):
     """
     Test the model
     :param cnn_model:
-    :param logpath:
+    :param log_path:
     :param x_test:
     :param y_test:
-    :param paths_list:
     :param categories:
     :param fold:
-    :param noise:
-    :param ds:
     :return:
     """
     scores_i, con_mat_df = get_model_scores(cnn_model, x_test=x_test, y_test=y_test, categories=categories)
-    plot_confusion_matrix(con_mat_df, logpath.joinpath('confusion_matrix_fold%s_noise%s.png' % (fold, noise_percentage)))
+    plot_confusion_matrix(con_mat_df, log_path.joinpath('confusion_matrix_fold%s_noise%s.png' %
+                                                        (fold, noise_percentage)))
 
     return scores_i, con_mat_df
 
 
-def create_train_and_test_model(logpath, n_classes, x_train, y_train, x_valid, y_valid, x_test, y_test, paths_list,
+def create_train_and_test_model(log_path, n_classes, x_train, y_train, x_valid, y_valid, x_test, y_test, paths_list,
                                 config, categories, fold, ds):
     """
     Create the model, train it and test it according to the specifications in config
     """
-    cnn_model = create_and_train_model(logpath, n_classes, x_train, y_train, x_valid, y_valid, paths_list, config, fold)
+    cnn_model = create_and_train_model(log_path, n_classes, x_train, y_train, x_valid, y_valid,
+                                       paths_list, config, fold)
 
     if type(config['NOISE_RATIO_TEST']) == list:
         noise_to_test = config['NOISE_RATIO_TEST']
@@ -251,7 +251,7 @@ def create_train_and_test_model(logpath, n_classes, x_train, y_train, x_valid, y
     con_mat_df = pd.DataFrame()
     for noise in noise_to_test:
         x_test, y_test, paths_list = load_more_noise(x_test, y_test, paths_list, noise, config, ds)
-        scores_noise, con_mat_noise = test_model(cnn_model, logpath, x_test, y_test, categories, fold, noise)
+        scores_noise, con_mat_noise = test_model(cnn_model, log_path, x_test, y_test, categories, fold, noise)
         scores_noise['noise_percentage'] = noise
         con_mat_noise['noise_percentage'] = noise
         scores_i = pd.concat([scores_i, scores_noise])
@@ -269,13 +269,13 @@ def load_more_noise(x_test, y_test, paths_list, noise, config, ds):
     return x_test, y_test, paths_list
 
 
-def run_from_config(config, logpath=None):
+def run_from_config(config, log_path=None):
     """
-    Run a train, test set according to config. The output will be saved on the logpath folder.
+    Run a train, test set according to config. The output will be saved on the log_path folder.
     To see the structure of the output folder, check the README.
 
     :param config:
-    :param logpath:
+    :param log_path:
     :return:
     """
     tf.random.set_seed(42)
@@ -286,12 +286,12 @@ def run_from_config(config, logpath=None):
 
     # Create a log directory to store all the results and parameters
     now_time = datetime.datetime.now()
-    if logpath is None:
-        logpath = pathlib.Path(config['OUTPUT_DIR']).joinpath(now_time.strftime('%y%m%d_%H%M%S'))
-    if not logpath.exists():
-        os.mkdir(str(logpath))
+    if log_path is None:
+        log_path = pathlib.Path(config['OUTPUT_DIR']).joinpath(now_time.strftime('%y%m%d_%H%M%S'))
+    if not log_path.exists():
+        os.mkdir(str(log_path))
 
-    json.dump(config, open(logpath.joinpath('config.json'), mode='a'))
+    json.dump(config, open(log_path.joinpath('config.json'), mode='a'))
 
     # Load the dataset
     ds = dataset.SpectrogramDataSet(data_dir=config['DATA_DIR'], image_width=IMAGE_WIDTH, image_height=IMAGE_HEIGHT,
@@ -310,9 +310,9 @@ def run_from_config(config, logpath=None):
             noise_ratio=config[
                 'NOISE_RATIO'])
         # Create and train the model
-        scores_i, con_matrix_i = create_train_and_test_model(logpath, ds.n_classes, x_train, y_train, x_valid, y_valid,
-                                                             x_test, y_test, paths_list, config, categories=ds.int2class,
-                                                             fold=0, ds=ds)
+        scores_i, con_matrix_i = create_train_and_test_model(log_path, ds.n_classes, x_train, y_train, x_valid, y_valid,
+                                                             x_test, y_test, paths_list, config,
+                                                             categories=ds.int2class, fold=0, ds=ds)
 
         # scores.loc[0] = ['random', scores_i[0], scores_i[1]]
         scores = scores_i
@@ -326,7 +326,7 @@ def run_from_config(config, logpath=None):
         for fold, x_train, y_train, x_valid, y_valid, x_test, y_test, paths_list in ds.folds(
                     noise_ratio=config['NOISE_RATIO'], n_folds=config['TEST_SPLIT'], valid_size=config['VALID_SPLIT']):
             # Create and train the model
-            scores_i, con_matrix_i = create_train_and_test_model(logpath, ds.n_classes, x_train, y_train, x_valid,
+            scores_i, con_matrix_i = create_train_and_test_model(log_path, ds.n_classes, x_train, y_train, x_valid,
                                                                  y_valid, x_test, y_test, paths_list, config,
                                                                  categories=ds.int2class, fold=fold, ds=ds)
 
@@ -346,7 +346,7 @@ def run_from_config(config, logpath=None):
                                                                                              'NOISE_RATIO'],
                                                                                          blocked_location=loc)
             # Create and train the model
-            scores_i, con_mat_norm = create_train_and_test_model(logpath, ds.n_classes, x_train, y_train, x_valid,
+            scores_i, con_mat_norm = create_train_and_test_model(log_path, ds.n_classes, x_train, y_train, x_valid,
                                                                  y_valid, x_test, y_test, paths_list, config,
                                                                  categories=ds.int2class, fold=loc, ds=ds)
             scores_i['fold'] = loc
@@ -355,11 +355,11 @@ def run_from_config(config, logpath=None):
             con_matrix_i['excluded_loc'] = loc
             con_matrix = pd.concat([con_matrix, con_matrix_i], ignore_index=True)
 
-    con_matrix.to_csv(logpath.joinpath('total_confusion_matrix.csv'))
-    scores.to_csv(logpath.joinpath('total_scores.csv'))
+    con_matrix.to_csv(log_path.joinpath('total_confusion_matrix.csv'))
+    scores.to_csv(log_path.joinpath('total_scores.csv'))
     con_matrix = con_matrix.drop(columns=['fold'])
     con_matrix_avg = con_matrix.groupby('label').mean()
-    plot_confusion_matrix(con_matrix_avg, save_path=logpath.joinpath('mean_confusion_matrix.png'))
+    plot_confusion_matrix(con_matrix_avg, save_path=log_path.joinpath('mean_confusion_matrix.png'))
 
     return scores, con_matrix
 
