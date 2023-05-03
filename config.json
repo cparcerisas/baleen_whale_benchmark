@@ -10,12 +10,12 @@
                         },
   "SAMPLES_PER_CLASS": 2500,
 
-  "NOISE_RATIO": 0.2,
-  "NOISE_RATIO_TEST": [0.2, 0.3, 0.6, 0.8],
+  "NOISE_RATIO": 0.125,
+  "NOISE_RATIO_TEST": [0.125, 0.3, 0.6, 0.8],
   "USE_CORRECTED_DATASET": true,
 
   "VALID_SPLIT": 0.3,
-  "TEST_SPLIT": 5,
+  "TEST_SPLIT": "blocked",
 
   "model_name": "IdilCNN",
   "BATCH_SIZE": 32,

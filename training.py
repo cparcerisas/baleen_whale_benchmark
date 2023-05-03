@@ -347,7 +347,7 @@ def run_from_config(config, log_path=None):
                                                                                              'NOISE_RATIO'],
                                                                                          blocked_location=loc)
             # Create and train the model
-            scores_i, con_mat_norm = create_train_and_test_model(log_path, ds.n_classes, x_train, y_train, x_valid,
+            scores_i, con_matrix_i = create_train_and_test_model(log_path, ds.n_classes, x_train, y_train, x_valid,
                                                                  y_valid, x_test, y_test, paths_list, config,
                                                                  categories=ds.int2class, fold=loc, ds=ds)
             scores_i['fold'] = loc
