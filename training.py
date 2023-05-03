@@ -353,7 +353,7 @@ def run_from_config(config, log_path=None):
             scores_i['fold'] = loc
             scores = pd.concat([scores, scores_i], ignore_index=True)
             con_matrix_i = con_matrix_i.reset_index(drop=False, names='label')
-            con_matrix_i['excluded_loc'] = loc
+            con_matrix_i['fold'] = loc
             con_matrix = pd.concat([con_matrix, con_matrix_i], ignore_index=True)
 
     con_matrix.to_csv(log_path.joinpath('total_confusion_matrix.csv'))

@@ -1,7 +1,7 @@
 {
   "DATA_DIR": "C:/Users/cleap/Documents/Data/Sound Data/cnn_and_noise",
   "OUTPUT_DIR": "//fs/shared/onderzoek/6. Marine Observation Center/Projects/Side_Projects/Acoustics/CNN_vs_noise/",
-  "LOCATIONS": ["BallenyIsland", "Casey", "ElephantIsland", "SKerguelenPlateau", "Greenwich", "MaudRise"],
+  "LOCATIONS": ["RossSea", "BallenyIsland", "Casey", "ElephantIsland", "SKerguelenPlateau", "Greenwich", "MaudRise"],
   "CATEGORIES" : ["20Plus", "20Hz", "A", "B", "D", "Dswp", "Z", "Noise"],
   "CATEGORIES_TO_JOIN": {
                           "20Hz20Plus":  ["20Plus","20Hz"],
@@ -11,7 +11,7 @@
   "SAMPLES_PER_CLASS": 2500,
 
   "NOISE_RATIO": 0.125,
-  "NOISE_RATIO_TEST": [0.125, 0.3, 0.6, 0.8],
+  "NOISE_RATIO_TEST": 0.125,
   "USE_CORRECTED_DATASET": true,
 
   "VALID_SPLIT": 0.3,
