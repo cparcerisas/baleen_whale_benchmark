@@ -153,16 +153,19 @@ class SpectrogramDataSet:
         # If the dataset is corrected, exclude the corrections
         joined_cat = self.map_join[category]
 
-        if samples_to_load == 'all':
-            last_img = -1
-        else:
-            # Sort the images, we only want the n first ones
-            order = all_images.str.split('_', expand=True)[0].astype(int)
-            order = order.sort_values()
-            all_images = all_images.reindex(order.index)
-            last_img = min(len(all_images), int(samples_to_load))
+        if len(all_images) > 0:
+            if samples_to_load == 'all':
+                last_img = -1
+            else:
+                # Sort the images, we only want the n first ones
+                order = all_images.str.split('_', expand=True)[0].astype(int)
+                order = order.sort_values()
+                all_images = all_images.reindex(order.index)
+                last_img = min(len(all_images), int(samples_to_load))
 
-        selected_images = all_images.iloc[:last_img]
+            selected_images = all_images.iloc[:last_img]
+        else:
+            selected_images = all_images
         # If using the corrected dataset, eliminate the ones that are not correct
         if self.corrected and category != 'Noise':
             correction_path = os.path.join(self.data_dir, category + '2Noise.csv')

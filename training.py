@@ -257,7 +257,6 @@ def create_train_and_test_model(log_path, n_classes, x_train, y_train, x_valid, 
         scores_i = pd.concat([scores_i, scores_noise])
         con_mat_df = pd.concat([con_mat_df, con_mat_noise])
 
-
     return scores_i, con_mat_df
 
 
