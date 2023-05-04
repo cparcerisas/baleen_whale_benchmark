@@ -119,9 +119,9 @@ def get_model_scores(model, x_test, y_test, categories):
     y_pred = np.argmax(y_pred, axis=1)
     con_mat = confusion_matrix(y_test, y_pred)
 
-    con_mat_norm = np.around(con_mat.astype('float') / con_mat.sum(axis=1)[:, np.newaxis], decimals=2)
+    # con_mat_norm = np.around(con_mat.astype('float') / con_mat.sum(axis=1)[:, np.newaxis], decimals=2)
 
-    con_mat_df = pd.DataFrame(con_mat_norm, index=categories, columns=categories)
+    con_mat_df = pd.DataFrame(con_mat, index=categories, columns=categories)
     scores_df = pd.DataFrame([scores], columns=['loss', 'accuracy'])
     return scores_df, con_mat_df
 
