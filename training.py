@@ -23,7 +23,7 @@ N_CHANNELS = 1
 CORRECTED_SAMPLES = 2500
 
 
-def create_model(log_path, n_classes):
+def create_model(log_path, n_classes, batch_size):
     """
     Create the model. Stores a summary of the model in the log_path, called model_summary.txt
     :param log_path: folder to store the logs
@@ -31,27 +31,27 @@ def create_model(log_path, n_classes):
     :return: created model
     """
     model = tf.keras.models.Sequential()
-    model.add(tf.keras.layers.Conv2D(32, kernel_size=(3, 3), activation='relu', padding="same",
+    model.add(tf.keras.layers.Conv2D(batch_size, kernel_size=(3, 3), activation='relu', padding="same",
                                      kernel_initializer='he_normal', input_shape=(IMAGE_WIDTH, IMAGE_HEIGHT, 1)))
 
     model.add(tf.keras.layers.BatchNormalization())
 
-    model.add(tf.keras.layers.Conv2D(32, kernel_size=(3, 3), activation='relu'))
+    model.add(tf.keras.layers.Conv2D(batch_size, kernel_size=(3, 3), activation='relu'))
     model.add(tf.keras.layers.BatchNormalization())
-    model.add(tf.keras.layers.Conv2D(32, kernel_size=5, strides=2, padding='same', activation='relu'))
+    model.add(tf.keras.layers.Conv2D(batch_size, kernel_size=5, strides=2, padding='same', activation='relu'))
     model.add(tf.keras.layers.MaxPooling2D((2, 2)))
     model.add(tf.keras.layers.BatchNormalization())
     model.add(tf.keras.layers.Dropout(0.3))
-    model.add(tf.keras.layers.Conv2D(64, kernel_size=(3, 3), strides=2, padding='same', activation='relu'))
+    model.add(tf.keras.layers.Conv2D(batch_size * 2, kernel_size=(3, 3), strides=2, padding='same', activation='relu'))
     model.add(tf.keras.layers.MaxPooling2D(pool_size=(2, 2)))
     model.add(tf.keras.layers.BatchNormalization())
-    model.add(tf.keras.layers.Conv2D(128, kernel_size=(3, 3), strides=2, padding='same', activation='relu'))
+    model.add(tf.keras.layers.Conv2D(batch_size * 4, kernel_size=(3, 3), strides=2, padding='same', activation='relu'))
     model.add(tf.keras.layers.Dropout(0.3))
     model.add(tf.keras.layers.Flatten())
     model.add(tf.keras.layers.Dense(128, kernel_regularizer=regularizers.l2(0.001)))
     model.add(tf.keras.layers.BatchNormalization())
     model.add(tf.keras.layers.ReLU())
-    model.add(tf.keras.layers.Dense(64, kernel_regularizer=regularizers.l2(0.001)))
+    model.add(tf.keras.layers.Dense(batch_size * 2, kernel_regularizer=regularizers.l2(0.001)))
     model.add(tf.keras.layers.ReLU())
     model.add(tf.keras.layers.Dropout(0.3))
     model.add(tf.keras.layers.Dense(n_classes, activation='softmax'))
@@ -119,8 +119,6 @@ def get_model_scores(model, x_test, y_test, categories):
     y_pred = np.argmax(y_pred, axis=1)
     con_mat = confusion_matrix(y_test, y_pred)
 
-    # con_mat_norm = np.around(con_mat.astype('float') / con_mat.sum(axis=1)[:, np.newaxis], decimals=2)
-
     con_mat_df = pd.DataFrame(con_mat, index=categories, columns=categories)
     scores_df = pd.DataFrame([scores], columns=['loss', 'accuracy'])
     return scores_df, con_mat_df
@@ -133,8 +131,10 @@ def plot_confusion_matrix(con_mat_df, save_path):
     :param save_path: str or path
     :return:
     """
+    con_mat_norm = con_mat_df.astype('float') / con_mat_df.sum(axis=1)
+
     plt.figure(figsize=(8, 8))
-    ax = sns.heatmap(con_mat_df, annot=True, cmap=plt.cm.Blues)
+    ax = sns.heatmap(con_mat_norm, annot=True, cmap=plt.cm.Blues)
     plt.tight_layout()
     plt.ylabel('True label')
     plt.xlabel('Predicted label')
@@ -203,7 +203,7 @@ def create_and_train_model(log_path, n_classes, x_train, y_train, x_valid, y_val
     :param fold:
     :return:
     """
-    cnn_model = create_model(log_path, n_classes=n_classes)
+    cnn_model = create_model(log_path, n_classes=n_classes, batch_size=config['BATCH_SIZE'])
     model_log_path = log_path.joinpath('fold%s' % fold)
     cnn_model, history = train_model(cnn_model, x_train, y_train, x_valid, y_valid, config['BATCH_SIZE'],
                                      config['EPOCHS'], config['early_stop'], config['monitoring_metric'],
@@ -269,16 +269,20 @@ def load_more_noise(x_test, y_test, paths_list, noise, config, ds):
     return x_test, y_test, paths_list
 
 
-def run_from_config(config, log_path=None):
+def run_from_config(config_path, log_path=None):
     """
     Run a train, test set according to config. The output will be saved on the log_path folder.
     To see the structure of the output folder, check the README.
 
-    :param config:
+    :param config_path:
     :param log_path:
     :return:
     """
     tf.random.set_seed(42)
+
+    # Read the config file
+    f = open(config_path)
+    config = json.load(f)
 
     if config['USE_CORRECTED_DATASET'] and config['SAMPLES_PER_CLASS'] > CORRECTED_SAMPLES:
         raise Exception('The SAMPLES_PER_CLASS parameter (%s) is greater than the corrected samples (%s). '
@@ -291,7 +295,7 @@ def run_from_config(config, log_path=None):
     if not log_path.exists():
         os.mkdir(str(log_path))
 
-    json.dump(config, open(log_path.joinpath('config.json'), mode='a'))
+    json.dump(config, open(log_path.joinpath(config_path.name), mode='a'))
 
     # Load the dataset
     ds = dataset.SpectrogramDataSet(data_dir=config['DATA_DIR'], image_width=IMAGE_WIDTH, image_height=IMAGE_HEIGHT,
@@ -370,7 +374,4 @@ if __name__ == '__main__':
     config_file = input('Config file path:')
     if config_file == '':
         config_file = './config.json'
-    # Read the config file
-    f = open(config_file)
-    config_json = json.load(f)
-    run_from_config(config_json)
+    run_from_config(pathlib.Path(config_file))

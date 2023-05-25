@@ -120,6 +120,28 @@ class SpectrogramDataSet:
 
         return x, y, total_paths
 
+    def load_from_file_list(self, file_list):
+        paths_list = []
+        labels = []
+        images = []
+        for img_name in file_list:
+            category = img_name.split('_')[-1].split('.')[0]
+            joined_cat = self.map_join[category]
+
+            img_array = cv2.imread(os.path.join(self.data_dir, category, img_name))
+
+            grey_image = np.mean(img_array, axis=2)
+            images.append(grey_image)
+            # This part is for joined classes
+
+            labels.append(self.classes2int[joined_cat])
+            paths_list.append(img_name)
+
+        x = self.reshape_images(images)
+        y = np.array(labels)
+
+        return images, labels, paths_list
+
     def load_data_category(self, category, samples_to_load, locations_to_exclude=None,
                            samples_to_exclude=None):
         """
