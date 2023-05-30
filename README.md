@@ -47,7 +47,7 @@ Set to "blocked" for blocked testing. Each of the locations will be left out onc
 * early_stop: 10
 * monitoring_metric: name of the metric to monitor (right now only accuracy available, val_accuracy)
 
-
+* CLASS_WEIGHTS: null, 'balanced' or dictonary with a weight per class (class as the key)
 
 
 ```json 

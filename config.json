@@ -1,6 +1,6 @@
 {
   "DATA_DIR": "C:/Users/cleap/Documents/Data/Sound Data/cnn_and_noise",
-  "OUTPUT_DIR": "//fs/shared/onderzoek/6. Marine Observation Center/Projects/PhD_Clea/Topics/CNN_vs_noise",
+  "OUTPUT_DIR": "C:/Users/cleap/Desktop/cnn_vs_noise",
   "LOCATIONS": ["RossSea", "BallenyIsland", "Casey", "ElephantIsland", "Kerguelen", "Greenwich", "MaudRise"],
   "CATEGORIES" : ["20Plus", "20Hz", "A", "B", "D", "Dswp", "Z", "Noise"],
   "CATEGORIES_TO_JOIN": {
@@ -22,5 +22,6 @@
   "EPOCHS": 2,
   "LEARNING_RATE": 1e-4,
   "early_stop": 2,
-  "monitoring_metric": "val_accuracy"
+  "monitoring_metric": "val_accuracy",
+  "CLASS_WEIGHTS": null
 }

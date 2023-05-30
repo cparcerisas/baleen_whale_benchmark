@@ -11,6 +11,7 @@ import tensorflow as tf
 import keras
 from sklearn.metrics import confusion_matrix
 from sklearn.metrics import f1_score
+from sklearn.utils.class_weight import compute_class_weight
 from tensorflow.keras import regularizers
 
 
@@ -66,7 +67,7 @@ def create_model(log_path, n_classes, batch_size):
 
 
 def train_model(model, x_train, y_train, x_valid, y_valid, batch_size, epochs, early_stop, monitoring_metric,
-                model_log_path):
+                class_weights, model_log_path):
     """
     Train the model. Will store the logs of the training inside the folder model_log_path in a file called logs.csv
     :param model: model created already
@@ -78,6 +79,7 @@ def train_model(model, x_train, y_train, x_valid, y_valid, batch_size, epochs, e
     :param epochs: number of epochs
     :param early_stop: number of no increase performance to stop
     :param monitoring_metric: string, metric to use to monitor performance
+    :param class_weights: string, None or dict
     :param model_log_path: folder where to store the logs
     :return: model, history
     """
@@ -99,7 +101,7 @@ def train_model(model, x_train, y_train, x_valid, y_valid, batch_size, epochs, e
     history_cb = tf.keras.callbacks.CSVLogger(model_log_path.joinpath('logs.csv'), separator=',', append=False)
 
     history = model.fit(x_train, y_train, batch_size=batch_size, epochs=epochs, validation_data=(x_valid, y_valid),
-                        callbacks=[early_stopping_cb, mdl_checkpoint_cb, history_cb])
+                        callbacks=[early_stopping_cb, mdl_checkpoint_cb, history_cb], class_weight=class_weights)
 
     return model, history
 
@@ -203,11 +205,16 @@ def create_and_train_model(log_path, n_classes, x_train, y_train, x_valid, y_val
     :param fold:
     :return:
     """
+    class_labels = np.unique(y_train)
+    class_weights = compute_class_weight(config['CLASS_WEIGHTS'], classes=class_labels, y=y_train)
+    class_weights_dict = {}
+    for label, weight in zip(class_labels, class_weights):
+        class_weights_dict[label] = weight
     cnn_model = create_model(log_path, n_classes=n_classes, batch_size=config['BATCH_SIZE'])
     model_log_path = log_path.joinpath('fold%s' % fold)
     cnn_model, history = train_model(cnn_model, x_train, y_train, x_valid, y_valid, config['BATCH_SIZE'],
                                      config['EPOCHS'], config['early_stop'], config['monitoring_metric'],
-                                     model_log_path=model_log_path)
+                                     class_weights_dict, model_log_path=model_log_path)
     cnn_model.save(model_log_path.joinpath('model'))
     plot_training_metrics(history, save_path=log_path, fold=fold)
     return cnn_model
