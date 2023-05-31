@@ -16,6 +16,7 @@ from tensorflow.keras import regularizers
 
 
 import dataset
+import metrics
 
 IMAGE_HEIGHT = 90
 IMAGE_WIDTH = 30
@@ -67,7 +68,7 @@ def create_model(log_path, n_classes, batch_size):
 
 
 def train_model(model, x_train, y_train, x_valid, y_valid, batch_size, epochs, early_stop, monitoring_metric,
-                class_weights, model_log_path):
+                class_weights, model_log_path, categories):
     """
     Train the model. Will store the logs of the training inside the folder model_log_path in a file called logs.csv
     :param model: model created already
@@ -84,8 +85,16 @@ def train_model(model, x_train, y_train, x_valid, y_valid, batch_size, epochs, e
     :return: model, history
     """
     opt = tf.keras.optimizers.Adam()
+    detection_metrics = metrics.ImbalancedDetectionMatrix(noise_class_name='Noise', classes_names=categories)
+    # metrics.NoiseMisclassificationRate(noise_class_name='Noise', classes_names=categories, name='noise_misclass'),
+    # metrics.CallAvgTPR(noise_class_name='Noise', classes_names=categories, name='call_tpr')
     METRICS = [
-        keras.metrics.SparseCategoricalAccuracy(name='accuracy')
+        keras.metrics.SparseCategoricalAccuracy(name='accuracy'),
+        metrics.f1_score,
+        metrics.recall_score,
+        detection_metrics.imbalanced_metric,
+        detection_metrics.noise_misclas_rate,
+        detection_metrics.call_avg_tpr
     ]
 
     model.compile(loss='sparse_categorical_crossentropy',
@@ -119,10 +128,10 @@ def get_model_scores(model, x_test, y_test, categories):
     scores = model.evaluate(x_test, y_test, verbose=0)
     y_pred = model.predict(x_test)
     y_pred = np.argmax(y_pred, axis=1)
-    con_mat = confusion_matrix(y_test, y_pred)
+    con_mat = confusion_matrix(y_test, y_pred, labels=np.arange(len(categories)))
 
     con_mat_df = pd.DataFrame(con_mat, index=categories, columns=categories)
-    scores_df = pd.DataFrame([scores], columns=['loss', 'accuracy'])
+    scores_df = pd.DataFrame([scores], columns=model.metrics_names)
     return scores_df, con_mat_df
 
 
@@ -146,7 +155,7 @@ def plot_confusion_matrix(con_mat_df, save_path):
     plt.show()
 
 
-def plot_training_metrics(history, save_path, fold):
+def plot_training_metrics(history, save_path, fold, chosen_metric):
     """
     Plot the history evolution of the metrics of the model and store the images in the folder save_path with the
     correct name indicating which fold was it run
@@ -154,10 +163,11 @@ def plot_training_metrics(history, save_path, fold):
     :param history: history, output from tensorflow
     :param save_path: folder path to store the training evolution metrics
     :param fold: which fold was it run on
+    :param chosen_metric: monitoring metric
     :return:
     """
-    training_acc = history.history['accuracy']
-    val_acc = history.history['val_accuracy']
+    training_acc = history.history[chosen_metric.split('val_')[1]]
+    val_acc = history.history[chosen_metric]
     training_loss = history.history['loss']
     val_loss = history.history['val_loss']
 
@@ -165,14 +175,14 @@ def plot_training_metrics(history, save_path, fold):
     plt.figure(figsize=(8, 8))
     plt.plot(epoch_count, training_acc, 'r--')
     plt.plot(epoch_count, val_acc, 'b-')
-    plt.legend(['Training acc', 'Validation acc'])
+    plt.legend(['Training %s' % chosen_metric, 'Validation %s' % chosen_metric])
     plt.xlabel('Epoch')
-    plt.ylabel('Accuracy')
+    plt.ylabel(chosen_metric)
     plt.yticks(np.arange(0, 1, 0.05))
     plt.xticks(np.arange(0, max(epoch_count), 2))
     # plt.text(10, 0.01, "Test acc: " + str(scores[1]))
     plt.grid()
-    plt.savefig(save_path.joinpath('training_accuracy_fold_%s.png' % fold))
+    plt.savefig(save_path.joinpath('training_%s_fold_%s.png' % (chosen_metric, fold)))
     plt.show()
 
     plt.figure(figsize=(8, 8))
@@ -190,7 +200,8 @@ def plot_training_metrics(history, save_path, fold):
     pass
 
 
-def create_and_train_model(log_path, n_classes, x_train, y_train, x_valid, y_valid, paths_list, config, fold):
+def create_and_train_model(log_path, n_classes, x_train, y_train, x_valid, y_valid, paths_list, config,
+                           fold, categories):
     """
     Create and train model, from config
 
@@ -210,13 +221,15 @@ def create_and_train_model(log_path, n_classes, x_train, y_train, x_valid, y_val
     class_weights_dict = {}
     for label, weight in zip(class_labels, class_weights):
         class_weights_dict[label] = weight
+
+    print('used class weights:', class_weights_dict)
     cnn_model = create_model(log_path, n_classes=n_classes, batch_size=config['BATCH_SIZE'])
     model_log_path = log_path.joinpath('fold%s' % fold)
     cnn_model, history = train_model(cnn_model, x_train, y_train, x_valid, y_valid, config['BATCH_SIZE'],
                                      config['EPOCHS'], config['early_stop'], config['monitoring_metric'],
-                                     class_weights_dict, model_log_path=model_log_path)
+                                     class_weights_dict, model_log_path=model_log_path, categories=categories)
     cnn_model.save(model_log_path.joinpath('model'))
-    plot_training_metrics(history, save_path=log_path, fold=fold)
+    plot_training_metrics(history, save_path=log_path, fold=fold, chosen_metric=config['monitoring_metric'])
     return cnn_model
 
 
@@ -246,7 +259,7 @@ def create_train_and_test_model(log_path, n_classes, x_train, y_train, x_valid, 
     Create the model, train it and test it according to the specifications in config
     """
     cnn_model = create_and_train_model(log_path, n_classes, x_train, y_train, x_valid, y_valid,
-                                       paths_list, config, fold)
+                                       paths_list, config, fold, categories)
 
     if type(config['NOISE_RATIO_TEST']) == list:
         noise_to_test = config['NOISE_RATIO_TEST']
