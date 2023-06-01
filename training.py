@@ -142,7 +142,7 @@ def plot_confusion_matrix(con_mat_df, save_path):
     :param save_path: str or path
     :return:
     """
-    con_mat_norm = con_mat_df.astype('float') / con_mat_df.sum(axis=1)
+    con_mat_norm = con_mat_df.astype('float').div(con_mat_df.sum(axis=1), axis=0)
 
     plt.figure(figsize=(8, 8))
     ax = sns.heatmap(con_mat_norm, annot=True, cmap=plt.cm.Blues)

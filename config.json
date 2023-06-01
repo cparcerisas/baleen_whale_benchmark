@@ -10,8 +10,8 @@
                         },
   "SAMPLES_PER_CLASS": 300,
 
-  "NOISE_RATIO": 0.5,
-  "NOISE_RATIO_TEST": 0.5,
+  "NOISE_RATIO": 0.4,
+  "NOISE_RATIO_TEST": 0.8,
   "USE_CORRECTED_DATASET": true,
 
   "VALID_SPLIT": 0.3,
@@ -19,7 +19,7 @@
 
   "model_name": "IdilCNN",
   "BATCH_SIZE": 32,
-  "EPOCHS": 20,
+  "EPOCHS": 2,
   "LEARNING_RATE": 1e-4,
   "early_stop": 5,
   "monitoring_metric": "val_imbalanced_metric",
