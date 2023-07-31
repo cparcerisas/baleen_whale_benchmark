@@ -84,7 +84,7 @@ def train_model(model, x_train, y_train, x_valid, y_valid, batch_size, epochs, e
     :param model_log_path: folder where to store the logs
     :return: model, history
     """
-    opt = tf.keras.optimizers.Adam()
+    opt = tf.keras.optimizers.legacy.Adam()
     detection_metrics = metrics.ImbalancedDetectionMatrix(noise_class_name='Noise', classes_names=categories)
     # metrics.NoiseMisclassificationRate(noise_class_name='Noise', classes_names=categories, name='noise_misclass'),
     # metrics.CallAvgTPR(noise_class_name='Noise', classes_names=categories, name='call_tpr')
@@ -152,7 +152,7 @@ def plot_confusion_matrix(con_mat_df, save_path):
     ax.xaxis.set_label_position('top')
     ax.xaxis.tick_top()
     plt.savefig(save_path)
-    plt.show()
+    plt.close()
 
 
 def plot_training_metrics(history, save_path, fold, chosen_metric):
@@ -183,7 +183,7 @@ def plot_training_metrics(history, save_path, fold, chosen_metric):
     # plt.text(10, 0.01, "Test acc: " + str(scores[1]))
     plt.grid()
     plt.savefig(save_path.joinpath('training_%s_fold_%s.png' % (chosen_metric, fold)))
-    plt.show()
+    plt.close()
 
     plt.figure(figsize=(8, 8))
     plt.plot(epoch_count, training_loss, 'g--')
@@ -195,7 +195,7 @@ def plot_training_metrics(history, save_path, fold, chosen_metric):
     plt.xticks(np.arange(0, max(epoch_count), 2))
     plt.grid()
     plt.savefig(save_path.joinpath('training_loss_fold_%s.png' % fold))
-    plt.show()
+    plt.close()
 
     pass
 
@@ -326,7 +326,7 @@ def run_from_config(config_path, log_path=None):
     scores = pd.DataFrame()
     con_matrix = pd.DataFrame()
     if type(config['TEST_SPLIT']) == float:
-        print('Performing single train/validation/test split (random). Ony one result will be given')
+        print('Performing single train/validation/test split (random). Only one result will be given')
         x_train, y_train, x_valid, y_valid, x_test, y_test, paths_list = ds.load_all_dataset(
             test_size=config['TEST_SPLIT'],
             valid_size=config['VALID_SPLIT'],
