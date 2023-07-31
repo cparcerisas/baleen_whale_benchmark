@@ -283,7 +283,7 @@ class SpectrogramDataSet:
 
         return x_train, y_train, x_valid, y_valid, x_test, y_test, paths_list
 
-    def load_blocked_dataset(self, blocked_location, valid_size, noise_ratio):
+    def load_blocked_dataset(self, blocked_location, valid_size, noise_ratio, noise_ratio_test):
         """
         Same than load_all_dataset but the test is decided by the blocked location
         :param blocked_location: string, name of the location to use for test and NOT for training or validation
@@ -305,7 +305,7 @@ class SpectrogramDataSet:
         paths_model_df.loc[paths_df_valid.index, 'set'] = 'valid'
 
         x_test, y_test, paths_list_test = self.load_data(locations_to_exclude=selected_locs,
-                                                         noise_ratio=noise_ratio, test=True)
+                                                         noise_ratio=noise_ratio_test, test=True)
         paths_test_df = pd.DataFrame({'path': paths_list_test})
         paths_test_df = paths_test_df.assign(set='test')
         paths_list_df = pd.concat([paths_model_df, paths_test_df])

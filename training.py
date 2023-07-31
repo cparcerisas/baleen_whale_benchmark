@@ -281,10 +281,11 @@ def create_train_and_test_model(log_path, n_classes, x_train, y_train, x_valid, 
 
 
 def load_more_noise(x_test, y_test, paths_list, noise, config, ds):
-    if noise > config['NOISE_RATIO']:
-        x_test, y_test, paths_list = ds.load_more_noise(x_test, y_test, paths_list, noise)
-    else:
-        print('Noise percentage lower than in training. Not considering it and testing on the trained ratio')
+    if noise != 'all':
+        if noise > config['NOISE_RATIO']:
+            x_test, y_test, paths_list = ds.load_more_noise(x_test, y_test, paths_list, noise)
+        else:
+            print('Noise percentage lower than in training. Not considering it and testing on the trained ratio')
 
     return x_test, y_test, paths_list
 
@@ -368,7 +369,7 @@ def run_from_config(config_path, log_path=None):
                                                                                              'VALID_SPLIT'],
                                                                                          noise_ratio=config[
                                                                                              'NOISE_RATIO'],
-                                                                                         blocked_location=loc)
+                                                                                         blocked_location=loc, noise_ratio_test=config['NOISE_RATIO_TEST'])
             # Create and train the model
             scores_i, con_matrix_i = create_train_and_test_model(log_path, ds.n_classes, x_train, y_train, x_valid,
                                                                  y_valid, x_test, y_test, paths_list, config,
