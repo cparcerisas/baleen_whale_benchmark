@@ -2,6 +2,7 @@ import pathlib
 import json
 import cv2
 import os
+import glob
 
 import pandas as pd
 import tensorflow as tf
@@ -11,10 +12,11 @@ import dataset
 import training
 import metrics
 
-data_folder = pathlib.Path('/Users/eschall/Documents/Python/CNN+Noise/Specs')
-model_to_analyze_folder = pathlib.Path('/Users/eschall/Documents/Python/CNN+Noise/Results/230731_152252/foldBallenyIsland2015/model')
-config_folder = pathlib.Path('/Users/eschall/Documents/Python/CNN+Noise/Results/230731_152252')
-csv_split_file = pathlib.Path('/Users/eschall/Documents/Python/CNN+Noise/Results/230731_152252/data_used_foldBallenyIsland2015_noiseall.csv')
+data_folder = pathlib.Path(r"D:\data\Miller_AntarcticData\Specs_sequenced")
+model_to_analyze_folder = pathlib.Path(r"D:\data\Miller_AntarcticData\CNN+Noise_Results\230731_153430_RossOut\foldRossSea2014\model")
+config_folder = pathlib.Path(r"D:\data\Miller_AntarcticData\CNN+Noise_Results\230731_153430_RossOut")
+from_csv = "false"
+csv_split_file = pathlib.Path(r"D:\data\Miller_AntarcticData\CNN+Noise_Results\230731_153430_RossOut\data_used_foldRossSea2014_noiseall.csv")
 
 IMAGE_HEIGHT = 90
 IMAGE_WIDTH = 30
@@ -90,9 +92,15 @@ def load_dataset_from_csv(csv_split_file, data_folder, config_folder):
                         categories=config['CATEGORIES'], join_cat=config["CATEGORIES_TO_JOIN"],
                         n_channels=N_CHANNELS)
 
-    data_split_df = pd.read_csv(csv_split_file)
-    data_split_test = data_split_df[data_split_df['set'] == 'test']
-    images_for_test = pd.Series(data_split_test['path'])
+    if from_csv == "true":
+        data_split_df = pd.read_csv(csv_split_file)
+        data_split_test = data_split_df[data_split_df['set'] == 'test']
+        images_for_test = pd.Series(data_split_test['path'])
+    else:
+        fold = os.path.split(os.path.split(model_to_analyze_folder)[0])[1][4:]
+        fold_wildcard = ('').join(['*',fold,'*.png'])
+        path_list = glob.glob(os.path.join(data_folder,'**',fold_wildcard))
+        images_for_test = [os.path.basename(x) for x in path_list]
 
     labels = []
     images = []
