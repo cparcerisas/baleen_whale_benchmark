@@ -124,7 +124,7 @@ def train_model(model, x_train, y_train, x_valid, y_valid, batch_size, epochs, e
     return model, history
 
 
-def get_model_scores(model, x_test, y_test, categories):
+def get_model_scores(model, x_test, y_test, categories, images_for_test, log_path):
     """
     Test the model on x_test and y_test.
 
@@ -136,6 +136,8 @@ def get_model_scores(model, x_test, y_test, categories):
     """
     scores = model.evaluate(x_test, y_test, verbose=0)
     y_pred = model.predict(x_test)
+    preds = pd.concat([pd.DataFrame(y_pred), pd.DataFrame(images_for_test)], axis=1)
+    preds.to_csv(log_path.joinpath('prediction.csv'))
     y_pred = np.argmax(y_pred, axis=1)
     con_mat = confusion_matrix(y_test, y_pred, labels=np.arange(len(categories)))
 
@@ -254,7 +256,7 @@ def test_model(cnn_model, log_path, x_test, y_test, categories, fold, noise_perc
     :param fold:
     :return:
     """
-    scores_i, con_mat_df = get_model_scores(cnn_model, x_test=x_test, y_test=y_test, categories=categories)
+    scores_i, con_mat_df = get_model_scores(cnn_model, x_test=x_test, y_test=y_test, categories=categories, images_to_test=paths_list, log_path=log_path)
 
 
     return scores_i, con_mat_df
@@ -288,7 +290,8 @@ def create_train_and_test_model(log_path, n_classes, x_train, y_train, x_valid, 
                                            paths_list, config, fold, categories, noise)
 
         for noise2 in noise_to_test:
-            x_test, y_test, paths_list, noise2 = load_more_noise(x_test, y_test, paths_list, 'test', noise, noise2, config, ds)
+            for x_test, y_test, images_for_test in
+            x_test, y_test, paths_list, noise2 in load_more_noise(x_test, y_test, paths_list, 'test', noise, noise2, config, ds)
             scores_noise, con_mat_noise = test_model(cnn_model, log_path, x_test, y_test, categories, fold, noise2,
                                                      paths_list)
             scores_noise['noise_percentage_train'] = noise
