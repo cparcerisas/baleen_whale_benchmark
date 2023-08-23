@@ -32,7 +32,7 @@ class ImbalancedDetectionMatrix(object):
         call_avg_tpr = tf.reduce_mean(diag_part / detections)
         noise_misclassification_rate = 1 - tf.reduce_sum(cm_noise) / (tf.reduce_sum(cm_noise_total, 0) +
                                                                       tf.constant(1e-15))
-        imbalanced_metric = 2 * (call_avg_tpr * noise_misclassification_rate) / (call_avg_tpr +
+        imbalanced_metric = 2 * (call_avg_tpr * (noise_misclassification_rate**2)) / (call_avg_tpr +
                                                                                  noise_misclassification_rate)
         return imbalanced_metric
 

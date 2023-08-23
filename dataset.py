@@ -272,16 +272,20 @@ class SpectrogramDataSet:
         """
         x, y, paths_list = self.load_data(locations_to_exclude=None,
                                           noise_ratio=noise_ratio)
-        paths_df = pd.DataFrame({'path': paths_list})
-        x_model, x_test, y_model, y_test, paths_model, paths_test = train_test_split(x, y, paths_df,
+        x_model, x_test, y_model, y_test, paths_model, paths_test = train_test_split(x, y, paths_list,
                                                                                      test_size=test_size, shuffle=True)
+        paths_test_df = pd.DataFrame({'path': paths_test})
+        paths_test_df = paths_test_df.assign(set='test')
         x_train, x_valid, y_train, y_valid, paths_train, paths_valid = train_test_split(x_model, y_model, paths_model,
                                                                                         test_size=valid_size,
                                                                                         shuffle=True)
-        paths_df['set']
-        paths_df.loc[paths_test.index, 'set'] = 'test'
+        paths_train_df = pd.DataFrame({'path': paths_train})
+        paths_train_df = paths_train_df.assign(set='train')
+        paths_valid_df = pd.DataFrame({'path': paths_valid})
+        paths_valid_df = paths_valid_df.assign(set='valid')
+        paths_df = pd.concat([paths_train_df, paths_valid_df, paths_test_df])
 
-        return x_train, y_train, x_valid, y_valid, x_test, y_test, paths_list
+        return x_train, y_train, x_valid, y_valid, x_test, y_test, paths_df
 
     def load_blocked_dataset(self, blocked_location, valid_size, noise_ratio, noise_ratio_test):
         """
@@ -344,7 +348,7 @@ class SpectrogramDataSet:
             paths_df.loc[paths_df_valid.index, 'set'] = 'valid'
             yield fold, x_train, y_train, x_valid, y_valid, x_test, y_test, paths_df
 
-    def load_more_noise(self, x_test, y_test, paths_df, new_noise_ratio):
+    def load_more_noise(self, x_test, y_test, paths_df, new_noise_ratio, phase):
         """
         Append to x_test and y_test more noise, NOT repeated (not the same samples).
         The amount of noise added is according to the new_noise_ratio.
@@ -368,7 +372,7 @@ class SpectrogramDataSet:
         y = np.concatenate([y_test, new_y])
 
         new_paths_df = pd.DataFrame({'path': new_paths_list})
-        new_paths_df['set'] = 'test'
+        new_paths_df['set'] = phase
 
         paths_df = pd.concat([paths_df, new_paths_df])
 
