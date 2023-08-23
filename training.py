@@ -69,7 +69,7 @@ def create_model(log_path, n_classes, batch_size):
 
 
 def train_model(model, x_train, y_train, x_valid, y_valid, batch_size, epochs, early_stop, monitoring_metric,
-                monitoring_direction, class_weights, model_log_path, categories):
+                monitoring_direction,learning_rate, class_weights, model_log_path, categories):
     """
     Train the model. Will store the logs of the training inside the folder model_log_path in a file called logs.csv
     :param model: model created already
@@ -86,8 +86,8 @@ def train_model(model, x_train, y_train, x_valid, y_valid, batch_size, epochs, e
     :return: model, history
     """
     lr_schedule = tf.keras.optimizers.schedules.ExponentialDecay(
-        initial_learning_rate=1e-4,
-        decay_steps=10000,
+        initial_learning_rate=learning_rate,
+        decay_steps=(len(x_train)/batch_size)*10,
         decay_rate=0.5)
     opt = tf.keras.optimizers.legacy.Adam(learning_rate=lr_schedule)
     detection_metrics = metrics.ImbalancedDetectionMatrix(noise_class_name='Noise', classes_names=categories)
@@ -238,7 +238,7 @@ def create_and_train_model(log_path, n_classes, x_train, y_train, x_valid, y_val
     model_log_path = log_path.joinpath('fold%s' % fold)
     cnn_model, history = train_model(cnn_model, x_train, y_train, x_valid, y_valid, config['BATCH_SIZE'],
                                      config['EPOCHS'], config['early_stop'], config['monitoring_metric'], config['monitoring_direction'],
-                                     class_weights_dict, model_log_path=model_log_path, categories=categories)
+                                     class_weights_dict, model_log_path=model_log_path, categories=categories,learning_rate=config['learning_rate'])
     cnn_model.save(model_log_path.joinpath('_'.join(['model',str(noise)])))
     plot_training_metrics(history, save_path=log_path, fold=fold, chosen_metric=config['monitoring_metric'])
     return cnn_model

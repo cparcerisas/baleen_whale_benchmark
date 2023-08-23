@@ -23,5 +23,6 @@
   "early_stop": 20,
   "monitoring_metric": "val_imbalanced_metric",
   "monitoring_direction": "max",
+  "learning_rate": 1e-4,
   "CLASS_WEIGHTS": null
 }
