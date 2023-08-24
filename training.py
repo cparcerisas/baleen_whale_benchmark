@@ -69,7 +69,7 @@ def create_model(log_path, n_classes, batch_size):
 
 
 def train_model(model, x_train, y_train, x_valid, y_valid, batch_size, epochs, early_stop, monitoring_metric,
-                monitoring_direction,learning_rate, class_weights, model_log_path, categories):
+                monitoring_direction, class_weights, model_log_path, categories, learning_rate):
     """
     Train the model. Will store the logs of the training inside the folder model_log_path in a file called logs.csv
     :param model: model created already
@@ -124,7 +124,7 @@ def train_model(model, x_train, y_train, x_valid, y_valid, batch_size, epochs, e
     return model, history
 
 
-def get_model_scores(model, x_test, y_test, categories, images_for_test, log_path):
+def get_model_scores(model, x_test, y_test, categories, images_to_test, log_path):
     """
     Test the model on x_test and y_test.
 
@@ -136,14 +136,13 @@ def get_model_scores(model, x_test, y_test, categories, images_for_test, log_pat
     """
     scores = model.evaluate(x_test, y_test, verbose=0)
     y_pred = model.predict(x_test)
-    preds = pd.concat([pd.DataFrame(y_pred), pd.DataFrame(images_for_test)], axis=1)
-    preds.to_csv(log_path.joinpath('prediction.csv'))
+    preds = pd.concat([pd.DataFrame(y_pred).reset_index(drop=True), pd.DataFrame(images_to_test).reset_index(drop=True)], axis=1)
     y_pred = np.argmax(y_pred, axis=1)
     con_mat = confusion_matrix(y_test, y_pred, labels=np.arange(len(categories)))
 
     con_mat_df = pd.DataFrame(con_mat, index=categories, columns=categories)
     scores_df = pd.DataFrame([scores], columns=model.metrics_names)
-    return scores_df, con_mat_df
+    return scores_df, con_mat_df, preds
 
 
 def plot_confusion_matrix(con_mat_df, save_path):
@@ -238,7 +237,7 @@ def create_and_train_model(log_path, n_classes, x_train, y_train, x_valid, y_val
     model_log_path = log_path.joinpath('fold%s' % fold)
     cnn_model, history = train_model(cnn_model, x_train, y_train, x_valid, y_valid, config['BATCH_SIZE'],
                                      config['EPOCHS'], config['early_stop'], config['monitoring_metric'], config['monitoring_direction'],
-                                     class_weights_dict, model_log_path=model_log_path, categories=categories,learning_rate=config['learning_rate'])
+                                     class_weights_dict, model_log_path=model_log_path, categories=categories, learning_rate=config['learning_rate'])
     cnn_model.save(model_log_path.joinpath('_'.join(['model',str(noise)])))
     plot_training_metrics(history, save_path=log_path, fold=fold, chosen_metric=config['monitoring_metric'])
     return cnn_model
@@ -256,10 +255,10 @@ def test_model(cnn_model, log_path, x_test, y_test, categories, fold, noise_perc
     :param fold:
     :return:
     """
-    scores_i, con_mat_df = get_model_scores(cnn_model, x_test=x_test, y_test=y_test, categories=categories, images_to_test=paths_list, log_path=log_path)
+    scores_i, con_mat_df, predictions = get_model_scores(cnn_model, x_test=x_test, y_test=y_test, categories=categories, images_to_test=paths_list, log_path=log_path)
 
 
-    return scores_i, con_mat_df
+    return scores_i, con_mat_df, predictions
 
 
 def create_train_and_test_model(log_path, n_classes, x_train, y_train, x_valid, y_valid, x_test, y_test, paths_list,
@@ -290,10 +289,9 @@ def create_train_and_test_model(log_path, n_classes, x_train, y_train, x_valid, 
                                            paths_list, config, fold, categories, noise)
 
         for noise2 in noise_to_test:
-            for x_test, y_test, images_for_test in
-            x_test, y_test, paths_list, noise2 in load_more_noise(x_test, y_test, paths_list, 'test', noise, noise2, config, ds)
-            scores_noise, con_mat_noise = test_model(cnn_model, log_path, x_test, y_test, categories, fold, noise2,
-                                                     paths_list)
+            x_test, y_test, paths_list, noise2 = load_more_noise(x_test, y_test, paths_list, 'test', noise, noise2, config, ds)
+            scores_noise, con_mat_noise, predictions = test_model(cnn_model, log_path, x_test, y_test, categories, fold, noise2,
+                                                     paths_list.path[paths_list.set == 'test'])
             scores_noise['noise_percentage_train'] = noise
             con_mat_noise['noise_percentage_train'] = noise
             scores_noise['noise_percentage_test'] = noise2
@@ -303,6 +301,7 @@ def create_train_and_test_model(log_path, n_classes, x_train, y_train, x_valid, 
             plot_confusion_matrix(con_mat_noise, log_path.joinpath('confusion_matrix_fold%s_noise%s_noise%s.png' %
                                                                 (fold, noise, noise2)))
             paths_list.to_csv(log_path.joinpath('data_used_fold%s_noise%s_noise%s.csv' % (fold, noise, noise2)))
+            predictions.to_csv(log_path.joinpath('predictions_fold%s_noise%s_noise%s.csv' % (fold, noise, noise2)))
 
     return scores_i, con_mat_df
 

@@ -10,8 +10,8 @@
                         },
   "SAMPLES_PER_CLASS": 1000,
 
-  "NOISE_RATIO": [0.2, 0.3],
-  "NOISE_RATIO_TEST": [0.1],
+  "NOISE_RATIO": [0.2],
+  "NOISE_RATIO_TEST": [0.2, 0.3],
   "USE_CORRECTED_DATASET": false,
 
   "VALID_SPLIT": 0.3,
