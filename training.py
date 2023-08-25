@@ -278,6 +278,9 @@ def create_train_and_test_model(log_path, n_classes, x_train, y_train, x_valid, 
 
     scores_i = pd.DataFrame()
     con_mat_df = pd.DataFrame()
+    x_test_orig = x_test
+    y_test_orig = y_test
+    paths_list_test_orig = paths_list[paths_list.set == 'test']
     for i, noise in enumerate(noise_to_train):
         if i == 0:
             noise_before = noise
@@ -288,6 +291,10 @@ def create_train_and_test_model(log_path, n_classes, x_train, y_train, x_valid, 
         cnn_model = create_and_train_model(log_path, n_classes, x_train, y_train, x_valid, y_valid,
                                            paths_list, config, fold, categories, noise)
 
+        x_test = x_test_orig
+        y_test = y_test_orig
+        paths_list = paths_list[paths_list.set != 'test']
+        paths_list = paths_list.append(paths_list_test_orig)
         for noise2 in noise_to_test:
             x_test, y_test, paths_list, noise2 = load_more_noise(x_test, y_test, paths_list, 'test', noise, noise2, config, ds)
             scores_noise, con_mat_noise, predictions = test_model(cnn_model, log_path, x_test, y_test, categories, fold, noise2,
@@ -309,15 +316,15 @@ def create_train_and_test_model(log_path, n_classes, x_train, y_train, x_valid, 
 def load_more_noise(x_test, y_test, paths_list, phase,  noise, noise2, config, ds):
     if noise != 'all':
         if phase == 'test':
-            if noise2 > noise:
+            if noise2 > config['NOISE_RATIO'][0]:
                 x_test, y_test, paths_list = ds.load_more_noise(x_test, y_test, paths_list, noise2, phase)
             elif noise2 < config['NOISE_RATIO'][0]:
-                print('Noise percentage lower than in training. Not considering it and testing on the first training ratio')
+                print('Noise percentage lower than in first training. Not considering it and testing on the first training ratio')
                 noise2 = config['NOISE_RATIO'][0]
 
         else:
             if noise2 > noise:
-                x_test, y_test, paths_list = ds.load_more_noise(x_test, y_test, paths_list, noise, phase)
+                x_test, y_test, paths_list = ds.load_more_noise(x_test, y_test, paths_list, noise2, phase)
 
 
     return x_test, y_test, paths_list, noise2
