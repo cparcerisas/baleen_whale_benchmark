@@ -8,10 +8,10 @@
                           "ABZ":  ["A","B", "Z"],
                           "DDswp": ["D", "Dswp"]
                         },
-  "SAMPLES_PER_CLASS": 1000,
+  "SAMPLES_PER_CLASS": 2500,
 
-  "NOISE_RATIO": [0.25, 0.9],
-  "NOISE_RATIO_TEST": [0.25, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9],
+  "NOISE_RATIO": [0.125, 0.9],
+  "NOISE_RATIO_TEST": [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9],
   "USE_CORRECTED_DATASET": false,
 
   "VALID_SPLIT": 0.3,
@@ -19,10 +19,11 @@
 
   "model_name": "IdilCNN",
   "BATCH_SIZE": 32,
-  "EPOCHS": 50,
-  "early_stop": 20,
+  "EPOCHS": 100,
+  "early_stop": 10,
   "monitoring_metric": "val_accuracy",
   "monitoring_direction": "max",
+  "loss_function": "custom_cross_entropy",
   "learning_rate": 1e-3,
   "CLASS_WEIGHTS": null
 }

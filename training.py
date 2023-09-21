@@ -68,7 +68,7 @@ def create_model(log_path, n_classes, batch_size):
     return model
 
 
-def train_model(model, x_train, y_train, x_valid, y_valid, batch_size, epochs, early_stop, monitoring_metric,
+def train_model(model, x_train, y_train, x_valid, y_valid, batch_size, epochs, loss_function, early_stop, monitoring_metric,
                 monitoring_direction, class_weights, model_log_path, categories, learning_rate):
     """
     Train the model. Will store the logs of the training inside the folder model_log_path in a file called logs.csv
@@ -101,8 +101,9 @@ def train_model(model, x_train, y_train, x_valid, y_valid, batch_size, epochs, e
         detection_metrics.noise_misclas_rate,
         detection_metrics.call_avg_tpr
     ]
-
-    model.compile(loss=custom_cross_entropy,
+    if loss_function == 'custom_cross_entropy':
+        loss_function = custom_cross_entropy
+    model.compile(loss=loss_function,
                   optimizer=opt,
                   metrics=METRICS,
                   jit_compile=True)
@@ -236,7 +237,7 @@ def create_and_train_model(log_path, n_classes, x_train, y_train, x_valid, y_val
     cnn_model = create_model(log_path, n_classes=n_classes, batch_size=config['BATCH_SIZE'])
     model_log_path = log_path.joinpath('fold%s' % fold)
     cnn_model, history = train_model(cnn_model, x_train, y_train, x_valid, y_valid, config['BATCH_SIZE'],
-                                     config['EPOCHS'], config['early_stop'], config['monitoring_metric'], config['monitoring_direction'],
+                                     config['EPOCHS'], config['loss_function'], config['early_stop'], config['monitoring_metric'], config['monitoring_direction'],
                                      class_weights_dict, model_log_path=model_log_path, categories=categories, learning_rate=config['learning_rate'])
     cnn_model.save(model_log_path.joinpath('_'.join(['model',str(noise)])))
     plot_training_metrics(history, save_path=log_path, fold=fold, chosen_metric=config['monitoring_metric'])

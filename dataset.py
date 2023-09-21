@@ -248,7 +248,10 @@ class SpectrogramDataSet:
 
                 # Not necessary if images already on the correct format
                 # resized_image = cv2.resize(img_array, (self.image_width, self.image_height))
-                grey_image = np.mean(img_array, axis=2)
+                try:
+                    grey_image = np.mean(img_array, axis=2)
+                except:
+                    print('this is where it stops')
                 images.append(grey_image)
 
                 # This part is for joined classes
