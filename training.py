@@ -13,6 +13,9 @@ from sklearn.metrics import confusion_matrix
 from sklearn.metrics import f1_score
 from sklearn.utils.class_weight import compute_class_weight
 from tensorflow.keras import regularizers
+import visualkeras
+
+from PIL import ImageFont
 
 
 import dataset
@@ -64,6 +67,16 @@ def create_model(log_path, n_classes, batch_size):
         # Pass the file handle in as a lambda function to make it callable
         model.summary(print_fn=lambda x: fh.write(x + '\n'))
 
+    font = ImageFont.truetype("arial.ttf", 15)
+    img = visualkeras.layered_view(model, legend=True, font=font,
+                             color_map={keras.src.layers.convolutional.conv2d.Conv2D: {'fill': '#241623', 'outline': '#1B101A'},
+                                        keras.src.layers.normalization.batch_normalization.BatchNormalization: {'fill': '#D0CD94', 'outline': '#1B101A'},
+                                        keras.src.layers.pooling.max_pooling2d.MaxPooling2D: {'fill': '#3C787E', 'outline': '#1B101A'},
+                                        keras.src.layers.reshaping.flatten.Flatten: {'fill': '#82B43F', 'outline': '#1B101A'},
+                                        keras.src.layers.core.dense.Dense: {'fill': '#C7EF00', 'outline': '#1B101A'},
+                                        keras.src.layers.Dropout: {'fill': '#CEAF1F', 'outline': '#1B101A'},
+                                        keras.src.layers.activation.relu.ReLU: {'fill': '#D56F3E', 'outline': '#1B101A'}})
+    img.save('model_visualkeras.png', dpi=(350, 350))
     return model
 
 
@@ -100,6 +113,8 @@ def train_model(model, x_train, y_train, x_valid, y_valid, batch_size, epochs, e
     model.compile(loss='sparse_categorical_crossentropy',
                   optimizer=opt,
                   metrics=METRICS)
+
+    model.save('my_model.h5')
 
     model_save_filename = model_log_path.joinpath('checkpoints')
 
