@@ -20,6 +20,7 @@ from PIL import ImageFont
 
 import dataset
 import metrics
+from custom_loss_function import custom_cross_entropy
 
 IMAGE_HEIGHT = 90
 IMAGE_WIDTH = 30
@@ -80,8 +81,8 @@ def create_model(log_path, n_classes, batch_size):
     return model
 
 
-def train_model(model, x_train, y_train, x_valid, y_valid, batch_size, epochs, early_stop, monitoring_metric,
-                class_weights, model_log_path, categories):
+def train_model(model, x_train, y_train, x_valid, y_valid, batch_size, epochs, loss_function, early_stop, monitoring_metric,
+                monitoring_direction, class_weights, model_log_path, categories, learning_rate):
     """
     Train the model. Will store the logs of the training inside the folder model_log_path in a file called logs.csv
     :param model: model created already
@@ -97,7 +98,11 @@ def train_model(model, x_train, y_train, x_valid, y_valid, batch_size, epochs, e
     :param model_log_path: folder where to store the logs
     :return: model, history
     """
-    opt = tf.keras.optimizers.Adam()
+    lr_schedule = tf.keras.optimizers.schedules.ExponentialDecay(
+        initial_learning_rate=learning_rate,
+        decay_steps=(len(x_train)/batch_size)*10,
+        decay_rate=0.5)
+    opt = tf.keras.optimizers.legacy.Adam(learning_rate=lr_schedule)
     detection_metrics = metrics.ImbalancedDetectionMatrix(noise_class_name='Noise', classes_names=categories)
     # metrics.NoiseMisclassificationRate(noise_class_name='Noise', classes_names=categories, name='noise_misclass'),
     # metrics.CallAvgTPR(noise_class_name='Noise', classes_names=categories, name='call_tpr')
@@ -109,19 +114,24 @@ def train_model(model, x_train, y_train, x_valid, y_valid, batch_size, epochs, e
         detection_metrics.noise_misclas_rate,
         detection_metrics.call_avg_tpr
     ]
-
-    model.compile(loss='sparse_categorical_crossentropy',
+    if loss_function == 'custom_cross_entropy':
+        loss_function = custom_cross_entropy
+    model.compile(loss=loss_function,
                   optimizer=opt,
-                  metrics=METRICS)
+                  metrics=METRICS,
+                  jit_compile=True)
 
     model.save('my_model.h5')
 
     model_save_filename = model_log_path.joinpath('checkpoints')
 
-    early_stopping_cb = keras.callbacks.EarlyStopping(patience=early_stop, restore_best_weights=True)
-    mdl_checkpoint_cb = keras.callbacks.ModelCheckpoint(
-        model_save_filename, save_weights_only=True, monitor=monitoring_metric, save_best_only=True
-    )
+    early_stopping_cb = keras.callbacks.EarlyStopping(monitor=monitoring_metric,mode=monitoring_direction,patience=early_stop, restore_best_weights=True)
+    mdl_checkpoint_cb = keras.callbacks.ModelCheckpoint(model_save_filename, save_weights_only=True, monitor=monitoring_metric, save_best_only=True)
+    # min_learning_rate = tf.keras.optimizers.schedules.ExponentialDecay(
+    #     initial_learning_rate=1e-5,
+    #     decay_steps=10000,
+    #     decay_rate=1.0)
+    #reduce_lr = keras.callbacks.ReduceLROnPlateau(monitor=monitoring_metric, factor=0.2,patience=8, min_lr= min_learning_rate)
     history_cb = tf.keras.callbacks.CSVLogger(model_log_path.joinpath('logs.csv'), separator=',', append=False)
 
     history = model.fit(x_train, y_train, batch_size=batch_size, epochs=epochs, validation_data=(x_valid, y_valid),
@@ -130,7 +140,7 @@ def train_model(model, x_train, y_train, x_valid, y_valid, batch_size, epochs, e
     return model, history
 
 
-def get_model_scores(model, x_test, y_test, categories):
+def get_model_scores(model, x_test, y_test, categories, images_to_test, log_path):
     """
     Test the model on x_test and y_test.
 
@@ -142,12 +152,13 @@ def get_model_scores(model, x_test, y_test, categories):
     """
     scores = model.evaluate(x_test, y_test, verbose=0)
     y_pred = model.predict(x_test)
+    preds = pd.concat([pd.DataFrame(y_pred).reset_index(drop=True), pd.DataFrame(images_to_test).reset_index(drop=True)], axis=1)
     y_pred = np.argmax(y_pred, axis=1)
     con_mat = confusion_matrix(y_test, y_pred, labels=np.arange(len(categories)))
 
     con_mat_df = pd.DataFrame(con_mat, index=categories, columns=categories)
     scores_df = pd.DataFrame([scores], columns=model.metrics_names)
-    return scores_df, con_mat_df
+    return scores_df, con_mat_df, preds
 
 
 def plot_confusion_matrix(con_mat_df, save_path):
@@ -167,7 +178,7 @@ def plot_confusion_matrix(con_mat_df, save_path):
     ax.xaxis.set_label_position('top')
     ax.xaxis.tick_top()
     plt.savefig(save_path)
-    plt.show()
+    plt.close()
 
 
 def plot_training_metrics(history, save_path, fold, chosen_metric):
@@ -198,7 +209,7 @@ def plot_training_metrics(history, save_path, fold, chosen_metric):
     # plt.text(10, 0.01, "Test acc: " + str(scores[1]))
     plt.grid()
     plt.savefig(save_path.joinpath('training_%s_fold_%s.png' % (chosen_metric, fold)))
-    plt.show()
+    plt.close()
 
     plt.figure(figsize=(8, 8))
     plt.plot(epoch_count, training_loss, 'g--')
@@ -210,13 +221,13 @@ def plot_training_metrics(history, save_path, fold, chosen_metric):
     plt.xticks(np.arange(0, max(epoch_count), 2))
     plt.grid()
     plt.savefig(save_path.joinpath('training_loss_fold_%s.png' % fold))
-    plt.show()
+    plt.close()
 
     pass
 
 
 def create_and_train_model(log_path, n_classes, x_train, y_train, x_valid, y_valid, paths_list, config,
-                           fold, categories):
+                           fold, categories, noise):
     """
     Create and train model, from config
 
@@ -241,9 +252,9 @@ def create_and_train_model(log_path, n_classes, x_train, y_train, x_valid, y_val
     cnn_model = create_model(log_path, n_classes=n_classes, batch_size=config['BATCH_SIZE'])
     model_log_path = log_path.joinpath('fold%s' % fold)
     cnn_model, history = train_model(cnn_model, x_train, y_train, x_valid, y_valid, config['BATCH_SIZE'],
-                                     config['EPOCHS'], config['early_stop'], config['monitoring_metric'],
-                                     class_weights_dict, model_log_path=model_log_path, categories=categories)
-    cnn_model.save(model_log_path.joinpath('model'))
+                                     config['EPOCHS'], config['loss_function'], config['early_stop'], config['monitoring_metric'], config['monitoring_direction'],
+                                     class_weights_dict, model_log_path=model_log_path, categories=categories, learning_rate=config['learning_rate'])
+    cnn_model.save(model_log_path.joinpath('_'.join(['model',str(noise)])))
     plot_training_metrics(history, save_path=log_path, fold=fold, chosen_metric=config['monitoring_metric'])
     return cnn_model
 
@@ -260,12 +271,10 @@ def test_model(cnn_model, log_path, x_test, y_test, categories, fold, noise_perc
     :param fold:
     :return:
     """
-    paths_list.to_csv(log_path.joinpath('data_used_fold%s_noise%s.csv' % (fold, noise_percentage)))
-    scores_i, con_mat_df = get_model_scores(cnn_model, x_test=x_test, y_test=y_test, categories=categories)
-    plot_confusion_matrix(con_mat_df, log_path.joinpath('confusion_matrix_fold%s_noise%s.png' %
-                                                        (fold, noise_percentage)))
+    scores_i, con_mat_df, predictions = get_model_scores(cnn_model, x_test=x_test, y_test=y_test, categories=categories, images_to_test=paths_list, log_path=log_path)
 
-    return scores_i, con_mat_df
+
+    return scores_i, con_mat_df, predictions
 
 
 def create_train_and_test_model(log_path, n_classes, x_train, y_train, x_valid, y_valid, x_test, y_test, paths_list,
@@ -273,8 +282,10 @@ def create_train_and_test_model(log_path, n_classes, x_train, y_train, x_valid, 
     """
     Create the model, train it and test it according to the specifications in config
     """
-    cnn_model = create_and_train_model(log_path, n_classes, x_train, y_train, x_valid, y_valid,
-                                       paths_list, config, fold, categories)
+    if type(config['NOISE_RATIO_TEST']) == list:
+        noise_to_train = config['NOISE_RATIO']
+    else:
+        noise_to_train = [config['NOISE_RATIO']]
 
     if type(config['NOISE_RATIO_TEST']) == list:
         noise_to_test = config['NOISE_RATIO_TEST']
@@ -283,25 +294,56 @@ def create_train_and_test_model(log_path, n_classes, x_train, y_train, x_valid, 
 
     scores_i = pd.DataFrame()
     con_mat_df = pd.DataFrame()
-    for noise in noise_to_test:
-        x_test, y_test, paths_list = load_more_noise(x_test, y_test, paths_list, noise, config, ds)
-        scores_noise, con_mat_noise = test_model(cnn_model, log_path, x_test, y_test, categories, fold, noise,
-                                                 paths_list)
-        scores_noise['noise_percentage'] = noise
-        con_mat_noise['noise_percentage'] = noise
-        scores_i = pd.concat([scores_i, scores_noise])
-        con_mat_df = pd.concat([con_mat_df, con_mat_noise])
+    x_test_orig = x_test
+    y_test_orig = y_test
+    paths_list_test_orig = paths_list[paths_list.set == 'test']
+    for i, noise in enumerate(noise_to_train):
+        if i == 0:
+            noise_before = noise
+        else:
+            noise_before = noise_to_train[i-1]
+        x_train, y_train, paths_list, noise = load_more_noise(x_train, y_train, paths_list, 'train',  noise_before, noise, config, ds)
+        x_valid, y_valid, paths_list, noise = load_more_noise(x_valid, y_valid, paths_list, 'valid', noise_before, noise, config, ds)
+        cnn_model = create_and_train_model(log_path, n_classes, x_train, y_train, x_valid, y_valid,
+                                           paths_list, config, fold, categories, noise)
+
+        x_test = x_test_orig
+        y_test = y_test_orig
+        paths_list = paths_list[paths_list.set != 'test']
+        paths_list = paths_list.append(paths_list_test_orig)
+        for noise2 in noise_to_test:
+            x_test, y_test, paths_list, noise2 = load_more_noise(x_test, y_test, paths_list, 'test', noise, noise2, config, ds)
+            scores_noise, con_mat_noise, predictions = test_model(cnn_model, log_path, x_test, y_test, categories, fold, noise2,
+                                                     paths_list.path[paths_list.set == 'test'])
+            scores_noise['noise_percentage_train'] = noise
+            con_mat_noise['noise_percentage_train'] = noise
+            scores_noise['noise_percentage_test'] = noise2
+            con_mat_noise['noise_percentage_test'] = noise2
+            scores_i = pd.concat([scores_i, scores_noise])
+            con_mat_df = pd.concat([con_mat_df, con_mat_noise])
+            plot_confusion_matrix(con_mat_noise, log_path.joinpath('confusion_matrix_fold%s_noise%s_noise%s.png' %
+                                                                (fold, noise, noise2)))
+            paths_list.to_csv(log_path.joinpath('data_used_fold%s_noise%s_noise%s.csv' % (fold, noise, noise2)))
+            predictions.to_csv(log_path.joinpath('predictions_fold%s_noise%s_noise%s.csv' % (fold, noise, noise2)))
 
     return scores_i, con_mat_df
 
 
-def load_more_noise(x_test, y_test, paths_list, noise, config, ds):
-    if noise > config['NOISE_RATIO']:
-        x_test, y_test, paths_list = ds.load_more_noise(x_test, y_test, paths_list, noise)
-    else:
-        print('Noise percentage lower than in training. Not considering it and testing on the trained ratio')
+def load_more_noise(x_test, y_test, paths_list, phase,  noise, noise2, config, ds):
+    if noise != 'all':
+        if phase == 'test':
+            if noise2 > config['NOISE_RATIO'][0]:
+                x_test, y_test, paths_list = ds.load_more_noise(x_test, y_test, paths_list, noise2, phase)
+            elif noise2 < config['NOISE_RATIO'][0]:
+                print('Noise percentage lower than in first training. Not considering it and testing on the first training ratio')
+                noise2 = config['NOISE_RATIO'][0]
 
-    return x_test, y_test, paths_list
+        else:
+            if noise2 > noise:
+                x_test, y_test, paths_list = ds.load_more_noise(x_test, y_test, paths_list, noise2, phase)
+
+
+    return x_test, y_test, paths_list, noise2
 
 
 def run_from_config(config_path, log_path=None):
@@ -338,16 +380,19 @@ def run_from_config(config_path, log_path=None):
                                     locations=config['LOCATIONS'], n_channels=N_CHANNELS,
                                     corrected=config['USE_CORRECTED_DATASET'],
                                     samples_per_class=config['SAMPLES_PER_CLASS'])
+
+    #define initial noise percentage
+    noise_init_training = config['NOISE_RATIO'][0]
+    noise_init_test = config['NOISE_RATIO_TEST'][0]
+
     scores = pd.DataFrame()
     con_matrix = pd.DataFrame()
     if type(config['TEST_SPLIT']) == float:
-        print('Performing single train/validation/test split (random). Ony one result will be given')
+        print('Performing single train/validation/test split (random). Only one result will be given')
         x_train, y_train, x_valid, y_valid, x_test, y_test, paths_list = ds.load_all_dataset(
             test_size=config['TEST_SPLIT'],
             valid_size=config['VALID_SPLIT'],
-
-            noise_ratio=config[
-                'NOISE_RATIO'])
+            noise_ratio=noise_init_training)
         # Create and train the model
         scores_i, con_matrix_i = create_train_and_test_model(log_path, ds.n_classes, x_train, y_train, x_valid, y_valid,
                                                              x_test, y_test, paths_list, config,
@@ -363,7 +408,7 @@ def run_from_config(config_path, log_path=None):
               'the train-validation split is done randomly. This is for better error estimation. '
               'Results are given per fold' % config['TEST_SPLIT'])
         for fold, x_train, y_train, x_valid, y_valid, x_test, y_test, paths_list in ds.folds(
-                    noise_ratio=config['NOISE_RATIO'], n_folds=config['TEST_SPLIT'], valid_size=config['VALID_SPLIT']):
+                    noise_ratio=noise_init_training, n_folds=config['TEST_SPLIT'], valid_size=config['VALID_SPLIT']):
             # Create and train the model
             scores_i, con_matrix_i = create_train_and_test_model(log_path, ds.n_classes, x_train, y_train, x_valid,
                                                                  y_valid, x_test, y_test, paths_list, config,
@@ -381,9 +426,8 @@ def run_from_config(config_path, log_path=None):
         for loc in config['LOCATIONS']:
             x_train, y_train, x_valid, y_valid, x_test, y_test, paths_list = ds.load_blocked_dataset(valid_size=config[
                                                                                              'VALID_SPLIT'],
-                                                                                         noise_ratio=config[
-                                                                                             'NOISE_RATIO'],
-                                                                                         blocked_location=loc)
+                                                                                         noise_ratio=noise_init_training,
+                                                                                         blocked_location=loc, noise_ratio_test=noise_init_test)
             # Create and train the model
             scores_i, con_matrix_i = create_train_and_test_model(log_path, ds.n_classes, x_train, y_train, x_valid,
                                                                  y_valid, x_test, y_test, paths_list, config,

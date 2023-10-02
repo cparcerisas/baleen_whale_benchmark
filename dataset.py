@@ -11,7 +11,7 @@ import tensorflow as tf
 from sklearn.preprocessing import LabelBinarizer
 
 # Seed to use when shuffling the dataset and the noise
-SHUFFLE_SEED = 43
+SHUFFLE_SEED = 42
 
 
 class SpectrogramDataSet:
@@ -74,7 +74,7 @@ class SpectrogramDataSet:
 
                 # Read all the images of that category
                 samples += len(pd.Series(os.listdir(path)))
-        return samples / (len(self.categories) - 1)
+        return samples / (len(self.int2class) - 1)
 
     def reshape_images(self, images):
         """
@@ -87,7 +87,7 @@ class SpectrogramDataSet:
         x = X / 255.0
         return x
 
-    def load_data(self, noise_ratio, locations_to_exclude=None):
+    def load_data(self, noise_ratio, locations_to_exclude=None, test=False):
         """
         The function will return the selected data for all the classes together, shuffled.
         For non-noise classes, the data included will be the first samples_per_class of the dataset (ordered),
@@ -101,18 +101,28 @@ class SpectrogramDataSet:
         total_labels = []
         total_paths = []
 
-        # Loop through all the categories
-        for cat_i, category in enumerate(self.categories):
-            # If Noise, select a random amount
-            if category == 'Noise':
-                samples_to_load = self.get_noise_samples(noise_ratio)
-            else:
-                samples_to_load = self.samples_per_class
-            # Add the data from that category
-            images, labels, paths_list = self.load_data_category(category, samples_to_load, locations_to_exclude)
-            total_images += images
-            total_labels += labels
-            total_paths += paths_list
+        if test == True:
+            for cat_i, category in enumerate(self.categories):
+                samples_to_load = 'all'
+                # Add the data from that category
+                images, labels, paths_list = self.load_data_category(category, samples_to_load, locations_to_exclude)
+                total_images += images
+                total_labels += labels
+                total_paths += paths_list
+
+        else:
+            # Loop through all the categories
+            for cat_i, category in enumerate(self.int2class):
+                # If Noise, select a random amount
+                if category == 'Noise':
+                    samples_to_load = self.get_noise_samples(noise_ratio)
+                else:
+                    samples_to_load = self.samples_per_class
+                # Add the data from that category
+                images, labels, paths_list = self.load_data_category(category, samples_to_load, locations_to_exclude)
+                total_images += images
+                total_labels += labels
+                total_paths += paths_list
 
         x = self.reshape_images(total_images)
         y = np.array(total_labels)
@@ -159,56 +169,96 @@ class SpectrogramDataSet:
         paths_list = []
         labels = []
         images = []
-        path = os.path.join(self.data_dir, category)
 
-        # Read all the images of that category
-        all_images = pd.Series(os.listdir(path))
 
-        # If there are one or more locations to exclude, exclude them from the list!
-        if locations_to_exclude is not None:
-            for loc in locations_to_exclude:
-                all_images = all_images.loc[~all_images.str.contains(loc)]
+        cats = dict((key, value) for (key, value) in self.map_join.items() if value == category)
+        num_samples = []
+        for subcat in cats:
+            path = os.path.join(self.data_dir, subcat)
+            num_samples.append(len(os.listdir(path)))
+        num_samples = np.array(num_samples)
 
-        if samples_to_exclude is not None:
-            all_images = all_images.loc[~all_images.isin(samples_to_exclude)]
+        if samples_to_load != 'all':
 
-        # If the dataset is corrected, exclude the corrections
-        joined_cat = self.map_join[category]
-
-        if len(all_images) > 0:
-            if samples_to_load == 'all':
-                last_img = -1
+            if any(num_samples < round(samples_to_load / len(num_samples))):
+                leftover_samples = samples_to_load - sum(num_samples[num_samples < round(samples_to_load / len(num_samples))])
+                if num_samples[num_samples >= round(samples_to_load / len(num_samples))].size == 0:
+                    raise Exception('samples per class too high for available dataset, please choose a lower number')
+                elif all(num_samples[num_samples >= round(samples_to_load / len(num_samples))] >= round(leftover_samples/len(num_samples[num_samples >= round(samples_to_load / len(num_samples))]))):
+                    num_samples[num_samples >= round(samples_to_load / len(num_samples))] = round(leftover_samples/len(num_samples[num_samples >= round(samples_to_load / len(num_samples))]))
+                elif any(num_samples[num_samples >= round(samples_to_load / len(num_samples))] < round(leftover_samples/len(num_samples[num_samples >= round(samples_to_load / len(num_samples))]))):
+                    leftover_samples2 = samples_to_load - sum(num_samples[num_samples < round(leftover_samples/len(num_samples[num_samples >= round(samples_to_load / len(num_samples))]))])
+                    if num_samples[num_samples >= round(leftover_samples2/len(num_samples[num_samples >= round(leftover_samples/len(num_samples[num_samples >= round(samples_to_load / len(num_samples))]))]))].size == 0:
+                        raise Exception('samples per class too high for available dataset, please choose a lower number')
+                    else:
+                        num_samples[num_samples >= round(leftover_samples2/len(num_samples[num_samples >= round(leftover_samples/len(num_samples[num_samples >= round(samples_to_load / len(num_samples))]))]))] = leftover_samples2
+                elif num_samples[num_samples >= round(leftover_samples/len(num_samples[num_samples >= round(samples_to_load / len(num_samples))]))].size == 0:
+                    raise Exception('samples per class too high for available dataset, please choose a lower number')
+                else:
+                    num_samples[num_samples >= round(leftover_samples/len(num_samples[num_samples >= round(samples_to_load / len(num_samples))]))] = round(leftover_samples/len(num_samples[num_samples >= round(samples_to_load / len(num_samples))]))
             else:
-                # Sort the images, we only want the n first ones
-                order = all_images.str.split('_', expand=True)[0].astype(int)
-                order = order.sort_values()
-                all_images = all_images.reindex(order.index)
-                last_img = min(len(all_images), int(samples_to_load))
+                num_samples[:] = round(samples_to_load / len(num_samples))
 
-            selected_images = all_images.iloc[:last_img]
-        else:
-            selected_images = all_images
-        # If using the corrected dataset, eliminate the ones that are not correct
-        if self.corrected and category != 'Noise':
-            correction_path = os.path.join(self.data_dir, category + '2Noise.csv')
-            if not os.path.exists(correction_path):
-                raise Exception('If you want to use the corrected dataset you should provide a csv file with the '
-                                'corrections for each of the original classes')
-            correction_csv = pd.read_csv(correction_path, header=None)
-            all_images_joined_names = selected_images.str.split('_').str.join('')
-            selected_images = selected_images.loc[~all_images_joined_names.isin(correction_csv[0])]
+        for i, subcat in enumerate(cats):
+            path = os.path.join(self.data_dir, subcat)
 
-        for img_path in selected_images:
-            img_array = cv2.imread(os.path.join(path, img_path))
+            # Read all the images of that category
+            images_per_subcat = pd.Series(os.listdir(path))
+            images_per_subcat = shuffle(images_per_subcat, random_state=SHUFFLE_SEED)
 
-            # Not necessary if images already on the correct format
-            # resized_image = cv2.resize(img_array, (self.image_width, self.image_height))
-            grey_image = np.mean(img_array, axis=2)
-            images.append(grey_image)
+            # If there are one or more locations to exclude, exclude them from the list!
+            if locations_to_exclude is not None:
+                for loc in locations_to_exclude:
+                    images_per_subcat = images_per_subcat.loc[~images_per_subcat.str.contains(loc)]
 
-            # This part is for joined classes
-            labels.append(self.classes2int[joined_cat])
-            paths_list.append(img_path)
+            if samples_to_exclude is not None:
+                images_per_subcat = images_per_subcat.loc[~images_per_subcat.isin(samples_to_exclude)]
+
+            # If the dataset is corrected, exclude the corrections
+            joined_cat = self.map_join[subcat]
+
+            if len(images_per_subcat) > 0:
+                if samples_to_load == 'all':
+                    last_img = -1
+                else:
+                    if self.corrected == True:
+                        # Sort the images, we only want the n first ones
+                        order = images_per_subcat.str.split('_', expand=True)[0].astype(int)
+                        order = order.sort_values()
+                        images_per_subcat = images_per_subcat.reindex(order.index)
+                    last_img = min(len(images_per_subcat), int(num_samples[i]))
+
+                selected_images = images_per_subcat.iloc[:last_img]
+            else:
+                selected_images = images_per_subcat
+            # If using the corrected dataset, eliminate the ones that are not correct
+            if self.corrected and subcat != 'Noise':
+                correction_path = os.path.join(self.data_dir, subcat + '2Noise.csv')
+                if not os.path.exists(correction_path):
+                    raise Exception('If you want to use the corrected dataset you should provide a csv file with the '
+                                    'corrections for each of the original classes')
+                correction_csv = pd.read_csv(correction_path, header=None)
+                all_images_joined_names = selected_images.str.split('_').str.join('')
+                selected_images = selected_images.loc[~all_images_joined_names.isin(correction_csv[0])]
+
+
+
+            for img_path in selected_images:
+                img_array = cv2.imread(os.path.join(path, img_path))
+
+                # Not necessary if images already on the correct format
+                # resized_image = cv2.resize(img_array, (self.image_width, self.image_height))
+                try:
+                    grey_image = np.mean(img_array, axis=2)
+                except:
+                    print('this is where it stops')
+                images.append(grey_image)
+
+                # This part is for joined classes
+                labels.append(self.classes2int[joined_cat])
+                paths_list.append(img_path)
+
+
 
         return images, labels, paths_list
 
@@ -225,18 +275,22 @@ class SpectrogramDataSet:
         """
         x, y, paths_list = self.load_data(locations_to_exclude=None,
                                           noise_ratio=noise_ratio)
-        paths_df = pd.DataFrame({'path': paths_list})
-        x_model, x_test, y_model, y_test, paths_model, paths_test = train_test_split(x, y, paths_df,
+        x_model, x_test, y_model, y_test, paths_model, paths_test = train_test_split(x, y, paths_list,
                                                                                      test_size=test_size, shuffle=True)
+        paths_test_df = pd.DataFrame({'path': paths_test})
+        paths_test_df = paths_test_df.assign(set='test')
         x_train, x_valid, y_train, y_valid, paths_train, paths_valid = train_test_split(x_model, y_model, paths_model,
                                                                                         test_size=valid_size,
                                                                                         shuffle=True)
-        paths_df['set']
-        paths_df.loc[paths_test.index, 'set'] = 'test'
+        paths_train_df = pd.DataFrame({'path': paths_train})
+        paths_train_df = paths_train_df.assign(set='train')
+        paths_valid_df = pd.DataFrame({'path': paths_valid})
+        paths_valid_df = paths_valid_df.assign(set='valid')
+        paths_df = pd.concat([paths_train_df, paths_valid_df, paths_test_df])
 
-        return x_train, y_train, x_valid, y_valid, x_test, y_test, paths_list
+        return x_train, y_train, x_valid, y_valid, x_test, y_test, paths_df
 
-    def load_blocked_dataset(self, blocked_location, valid_size, noise_ratio):
+    def load_blocked_dataset(self, blocked_location, valid_size, noise_ratio, noise_ratio_test):
         """
         Same than load_all_dataset but the test is decided by the blocked location
         :param blocked_location: string, name of the location to use for test and NOT for training or validation
@@ -258,7 +312,7 @@ class SpectrogramDataSet:
         paths_model_df.loc[paths_df_valid.index, 'set'] = 'valid'
 
         x_test, y_test, paths_list_test = self.load_data(locations_to_exclude=selected_locs,
-                                                         noise_ratio=noise_ratio)
+                                                         noise_ratio=noise_ratio_test, test=True)
         paths_test_df = pd.DataFrame({'path': paths_list_test})
         paths_test_df = paths_test_df.assign(set='test')
         paths_list_df = pd.concat([paths_model_df, paths_test_df])
@@ -297,7 +351,7 @@ class SpectrogramDataSet:
             paths_df.loc[paths_df_valid.index, 'set'] = 'valid'
             yield fold, x_train, y_train, x_valid, y_valid, x_test, y_test, paths_df
 
-    def load_more_noise(self, x_test, y_test, paths_df, new_noise_ratio):
+    def load_more_noise(self, x_test, y_test, paths_df, new_noise_ratio, phase):
         """
         Append to x_test and y_test more noise, NOT repeated (not the same samples).
         The amount of noise added is according to the new_noise_ratio.
@@ -321,7 +375,7 @@ class SpectrogramDataSet:
         y = np.concatenate([y_test, new_y])
 
         new_paths_df = pd.DataFrame({'path': new_paths_list})
-        new_paths_df['set'] = 'test'
+        new_paths_df['set'] = phase
 
         paths_df = pd.concat([paths_df, new_paths_df])
 
@@ -339,4 +393,4 @@ class SpectrogramDataSet:
             samples_per_class = self.how_many_samples()
         else:
             samples_per_class = self.samples_per_class
-        return ((len(self.categories) - 1) * samples_per_class * noise_ratio) / (1 - noise_ratio)
+        return ((len(self.int2class) - 1) * samples_per_class * noise_ratio) / (1 - noise_ratio)
