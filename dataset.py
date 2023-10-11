@@ -1,27 +1,27 @@
 import os
-import collections
 import cv2
 import pandas as pd
 import numpy as np
 from sklearn.model_selection import train_test_split
 from sklearn.utils import shuffle
-from sklearn.preprocessing import OneHotEncoder
 from sklearn.model_selection import StratifiedKFold
-import tensorflow as tf
-from sklearn.preprocessing import LabelBinarizer
+from tqdm import tqdm
 
 # Seed to use when shuffling the dataset and the noise
 SHUFFLE_SEED = 42
 
+IMAGE_HEIGHT = 90
+IMAGE_WIDTH = 30
+N_CHANNELS = 1
+
+CORRECTED_SAMPLES = 2500
+
 
 class SpectrogramDataSet:
-    def __init__(self, data_dir, image_width, image_height, categories, join_cat, locations, n_channels, corrected,
+    def __init__(self, data_dir, categories, join_cat, locations, corrected,
                  samples_per_class='all'):
         """
-
         :param data_dir:
-        :param image_width:
-        :param image_height:
         :param categories:
         :param join_cat:
         :param locations:
@@ -32,9 +32,6 @@ class SpectrogramDataSet:
         """
         self.locations = locations
         self.data_dir = data_dir
-        self.image_height = image_height
-        self.image_width = image_width
-        self.n_channels = n_channels
         self.categories = categories
         self.corrected = corrected
         self.join_cat = join_cat
@@ -76,84 +73,98 @@ class SpectrogramDataSet:
                 samples += len(pd.Series(os.listdir(path)))
         return samples / (len(self.int2class) - 1)
 
-    def reshape_images(self, images):
+    @staticmethod
+    def reshape_images(images):
         """
         Reshape all the images to the specified height, width and channels during init of object
 
         :param images: list of images
         :return: array with normalized images (0 to 1) with the correct shape
         """
-        X = np.array(images).reshape(-1, self.image_width, self.image_height, self.n_channels)
+        X = np.array(images).reshape(-1, IMAGE_WIDTH, IMAGE_HEIGHT, N_CHANNELS)
         x = X / 255.0
         return x
 
-    def load_data(self, noise_ratio, locations_to_exclude=None, test=False):
+    @staticmethod
+    def join_paths_to_df(paths_train, paths_valid, paths_test):
+        train_df = pd.DataFrame({'path': paths_train})
+        valid_df = pd.DataFrame({'path': paths_valid})
+        test_df = pd.DataFrame({'path': paths_test})
+        train_df = train_df.assign(set='train')
+        valid_df = valid_df.assign(set='valid')
+        test_df = test_df.assign(set='test')
+        paths_df = pd.concat([train_df, valid_df, test_df])
+        return paths_df
+
+    def prepare_all_dataset(self, test_size, valid_size, noise_ratio):
         """
-        The function will return the selected data for all the classes together, shuffled.
-        For non-noise classes, the data included will be the first samples_per_class of the dataset (ordered),
-        excluding the ones corresponding to the locations to exclude, if any.
+        Will load all the labeled data (up to samples_per_class for each class)
+        and some noise samples up to a certain noise_ratio
+
+        :param test_size: float (0 to 1), percentage from the total data loaded to split randomly to test
+        :param valid_size: float (0 to 1), percentage from the model (not test) data loaded to split randomly to
+        validation
+        :param noise_ratio: float (0 to 1), ratio of noise of the total dataset.
+        :return: x_train, y_train, x_valid, y_valid, x_test, y_test, paths_list (of all the data)
+        """
+        paths_list = self.select_data(locations_to_exclude=None,
+                                          noise_ratio=noise_ratio)
+        x, y = self.load_from_file_list(file_list=paths_list)
+        x_model, x_test, y_model, y_test, paths_model, paths_test = train_test_split(x, y, paths_list,
+                                                                                     test_size=test_size, shuffle=True)
+        x_train, x_valid, y_train, y_valid, paths_train, paths_valid = train_test_split(x_model, y_model, paths_model,
+                                                                                        test_size=valid_size,
+                                                                                        shuffle=True)
+        paths_df = self.join_paths_to_df(paths_train, paths_valid, paths_test)
+
+        return paths_df
+
+    def prepare_blocked_dataset(self, blocked_location, valid_size, noise_ratio, noise_ratio_test):
+        """
+        Same than prepare_all_dataset but the test is decided by the blocked location
+        :param blocked_location: string, name of the location to use for test and NOT for training or validation
+        :param valid_size: float (0 to 1), percentage from the model (not test) data loaded to split randomly to
+        validation
+        :param noise_ratio: float (0 to 1), ratio of noise of the total dataset.
+        :return: x_train, y_train, x_valid, y_valid, x_test, y_test, paths_list (of all the data)
+        """
+        selected_locs = list(set(self.locations) - {blocked_location})
+        print('selecting model data...')
+        paths_list_model = self.select_data(locations_to_exclude=[blocked_location], noise_ratio=noise_ratio)
+        x, y = self.load_from_file_list(file_list=paths_list_model)
+        paths_train, paths_valid = train_test_split(paths_list_model, stratify=y, test_size=valid_size, shuffle=True)
+
+        print('selecting test data...')
+        paths_test = self.select_data(locations_to_exclude=selected_locs, noise_ratio=noise_ratio_test)
+        paths_df = self.join_paths_to_df(paths_train, paths_valid, paths_test)
+        return paths_df
+
+    def folds(self, noise_ratio, n_folds, valid_size):
+        """
+        Loop through the folds. The data will be first loaded (x, y) according to the samples per class and noise ratio.
+        Once the data is loaded, it will be split between model and test according to the folds.
+        Inside every fold, model split is split further into train and test, but this time randomly.
 
         :param noise_ratio: float (0 to 1), ratio of noise of the total dataset.
-        :param locations_to_exclude: list of locations to not load (for blocked testing)
-        :return: x, y and paths
+        :param n_folds: number of folds to loop through
+        :param valid_size: float (0 to 1) validation split from the model split
+        :return: fold, x_train, y_train, x_vali, y_valid, x_test, y_test, paths_list (for all together)
         """
-        total_images = []
-        total_labels = []
-        total_paths = []
+        paths_list = self.select_data(noise_ratio=noise_ratio, locations_to_exclude=None)
+        kfold = StratifiedKFold(n_splits=n_folds, shuffle=True)
+        y = self.read_labels_from_file_list(file_list=paths_list)
+        for fold, (train_index, test_index) in enumerate(kfold.split(paths_list, y)):
+            paths_model = paths_list[train_index]
+            y_model = y[train_index]
+            paths_test = paths_list[test_index]
 
-        if test == True:
-            for cat_i, category in enumerate(self.categories):
-                samples_to_load = 'all'
-                # Add the data from that category
-                images, labels, paths_list = self.load_data_category(category, samples_to_load, locations_to_exclude)
-                total_images += images
-                total_labels += labels
-                total_paths += paths_list
+            paths_train, paths_valid = train_test_split(paths_model, stratify=y_model,
+                                                        test_size=valid_size, shuffle=True)
+            paths_df = self.join_paths_to_df(paths_train, paths_valid, paths_test)
+            yield fold, paths_df
 
-        else:
-            # Loop through all the categories
-            for cat_i, category in enumerate(self.int2class):
-                # If Noise, select a random amount
-                if category == 'Noise':
-                    samples_to_load = self.get_noise_samples(noise_ratio)
-                else:
-                    samples_to_load = self.samples_per_class
-                # Add the data from that category
-                images, labels, paths_list = self.load_data_category(category, samples_to_load, locations_to_exclude)
-                total_images += images
-                total_labels += labels
-                total_paths += paths_list
-
-        x = self.reshape_images(total_images)
-        y = np.array(total_labels)
-        x, y, total_paths = shuffle(x, y, total_paths)
-
-        return x, y, total_paths
-
-    def load_from_file_list(self, file_list):
-        paths_list = []
-        labels = []
-        images = []
-        for img_name in file_list:
-            category = img_name.split('_')[-1].split('.')[0]
-            joined_cat = self.map_join[category]
-
-            img_array = cv2.imread(os.path.join(self.data_dir, category, img_name))
-
-            grey_image = np.mean(img_array, axis=2)
-            images.append(grey_image)
-            # This part is for joined classes
-
-            labels.append(self.classes2int[joined_cat])
-            paths_list.append(img_name)
-
-        x = self.reshape_images(images)
-        y = np.array(labels)
-
-        return images, labels, paths_list
-
-    def load_data_category(self, category, samples_to_load, locations_to_exclude=None,
-                           samples_to_exclude=None):
+    def select_files_category(self, category, samples_to_load, locations_to_exclude=None,
+                              samples_to_exclude=None):
         """
         The function will return the selected data.
         For non-noise classes, the data included will be the first samples_to_load of the dataset (ordered),
@@ -161,45 +172,51 @@ class SpectrogramDataSet:
         if any.
 
         :param category: string, category to load
-        :param samples_to_load: int, number of samples per class
+        :param samples_to_load: int, number of samples per category (sum of all subclasses)
         :param locations_to_exclude:
         :param samples_to_exclude:
         :return:
         """
-        paths_list = []
-        labels = []
-        images = []
-
-
-        cats = dict((key, value) for (key, value) in self.map_join.items() if value == category)
+        subcats = dict((key, value) for (key, value) in self.map_join.items() if value == category)
+        # Load all the available samples from the folder
         num_samples = []
-        for subcat in cats:
+        for subcat in subcats:
             path = os.path.join(self.data_dir, subcat)
             num_samples.append(len(os.listdir(path)))
         num_samples = np.array(num_samples)
 
         if samples_to_load != 'all':
+            n_subcategories = len(subcats)
+            samples_per_subcategory = round(samples_to_load / n_subcategories)
+            # The sum of all the samples of the subclasses is smaller than the samples to load
+            if num_samples.sum() < samples_to_load:
+                raise Exception('Samples per class too high for available dataset, please choose a lower number')
 
-            if any(num_samples < round(samples_to_load / len(num_samples))):
-                leftover_samples = samples_to_load - sum(num_samples[num_samples < round(samples_to_load / len(num_samples))])
-                if num_samples[num_samples >= round(samples_to_load / len(num_samples))].size == 0:
-                    raise Exception('samples per class too high for available dataset, please choose a lower number')
-                elif all(num_samples[num_samples >= round(samples_to_load / len(num_samples))] >= round(leftover_samples/len(num_samples[num_samples >= round(samples_to_load / len(num_samples))]))):
-                    num_samples[num_samples >= round(samples_to_load / len(num_samples))] = round(leftover_samples/len(num_samples[num_samples >= round(samples_to_load / len(num_samples))]))
-                elif any(num_samples[num_samples >= round(samples_to_load / len(num_samples))] < round(leftover_samples/len(num_samples[num_samples >= round(samples_to_load / len(num_samples))]))):
-                    leftover_samples2 = samples_to_load - sum(num_samples[num_samples < round(leftover_samples/len(num_samples[num_samples >= round(samples_to_load / len(num_samples))]))])
-                    if num_samples[num_samples >= round(leftover_samples2/len(num_samples[num_samples >= round(leftover_samples/len(num_samples[num_samples >= round(samples_to_load / len(num_samples))]))]))].size == 0:
-                        raise Exception('samples per class too high for available dataset, please choose a lower number')
-                    else:
-                        num_samples[num_samples >= round(leftover_samples2/len(num_samples[num_samples >= round(leftover_samples/len(num_samples[num_samples >= round(samples_to_load / len(num_samples))]))]))] = leftover_samples2
-                elif num_samples[num_samples >= round(leftover_samples/len(num_samples[num_samples >= round(samples_to_load / len(num_samples))]))].size == 0:
-                    raise Exception('samples per class too high for available dataset, please choose a lower number')
-                else:
-                    num_samples[num_samples >= round(leftover_samples/len(num_samples[num_samples >= round(samples_to_load / len(num_samples))]))] = round(leftover_samples/len(num_samples[num_samples >= round(samples_to_load / len(num_samples))]))
-            else:
-                num_samples[:] = round(samples_to_load / len(num_samples))
+            # There is enough data at each subclass
+            elif all(num_samples >= samples_per_subcategory):
+                samples_to_load_per_subcat = np.repeat(samples_per_subcategory, n_subcategories)
 
-        for i, subcat in enumerate(cats):
+            # If there is one of the subclasses which has less than its proportional part, check if we can load more
+            # of the other subclasses, and do it iteratively until all the samples are reached
+            elif any(num_samples < samples_per_subcategory):
+                samples_df = pd.DataFrame(index=subcats.keys(), columns=['samples_to_load', 'available', 'needed'])
+                samples_df['available'] = num_samples
+                samples_df['needed'] = samples_per_subcategory
+                samples_df['samples_to_load'] = samples_df[['available', 'needed']].min()
+                total_loaded = samples_df.samples_to_load.sum()
+                while total_loaded < num_samples:
+                    leftover = num_samples - total_loaded
+                    samples_df['needed'] += round(leftover / (samples_df['available'] > samples_df['needed']).sum())
+                    samples_df['samples_to_load'] = samples_df[['available', 'needed']].min()
+                    total_loaded = samples_df.samples_to_load.sum()
+                samples_to_load_per_subcat = samples_df['samples_to_load'].values
+        else:
+            samples_to_load_per_subcat = num_samples
+
+        print(subcats, samples_to_load, num_samples)
+
+        total_selected_subcat = []
+        for i, subcat in enumerate(subcats):
             path = os.path.join(self.data_dir, subcat)
 
             # Read all the images of that category
@@ -215,18 +232,16 @@ class SpectrogramDataSet:
                 images_per_subcat = images_per_subcat.loc[~images_per_subcat.isin(samples_to_exclude)]
 
             # If the dataset is corrected, exclude the corrections
-            joined_cat = self.map_join[subcat]
-
             if len(images_per_subcat) > 0:
                 if samples_to_load == 'all':
                     last_img = -1
                 else:
-                    if self.corrected == True:
+                    if self.corrected:
                         # Sort the images, we only want the n first ones
                         order = images_per_subcat.str.split('_', expand=True)[0].astype(int)
                         order = order.sort_values()
                         images_per_subcat = images_per_subcat.reindex(order.index)
-                    last_img = min(len(images_per_subcat), int(num_samples[i]))
+                    last_img = samples_to_load_per_subcat[i]
 
                 selected_images = images_per_subcat.iloc[:last_img]
             else:
@@ -235,123 +250,80 @@ class SpectrogramDataSet:
             if self.corrected and subcat != 'Noise':
                 correction_path = os.path.join(self.data_dir, subcat + '2Noise.csv')
                 if not os.path.exists(correction_path):
-                    raise Exception('If you want to use the corrected dataset you should provide a csv file with the '
-                                    'corrections for each of the original classes')
+                    raise Exception(
+                        'If you want to use the corrected dataset you should provide a csv file with the '
+                        'corrections for each of the original classes')
                 correction_csv = pd.read_csv(correction_path, header=None)
                 all_images_joined_names = selected_images.str.split('_').str.join('')
                 selected_images = selected_images.loc[~all_images_joined_names.isin(correction_csv[0])]
+            total_selected_subcat += list(selected_images)
+        return total_selected_subcat
 
-
-
-            for img_path in selected_images:
-                img_array = cv2.imread(os.path.join(path, img_path))
-
-                # Not necessary if images already on the correct format
-                # resized_image = cv2.resize(img_array, (self.image_width, self.image_height))
-                try:
-                    grey_image = np.mean(img_array, axis=2)
-                except:
-                    print('this is where it stops')
-                images.append(grey_image)
-
-                # This part is for joined classes
-                labels.append(self.classes2int[joined_cat])
-                paths_list.append(img_path)
-
-
-
-        return images, labels, paths_list
-
-    def load_all_dataset(self, test_size, valid_size, noise_ratio):
+    def select_data(self, noise_ratio, locations_to_exclude=None):
         """
-        Will load all the labeled data (up to samples_per_class for each class)
-        and some noise samples up to a certain noise_ratio
-
-        :param test_size: float (0 to 1), percentage from the total data loaded to split randomly to test
-        :param valid_size: float (0 to 1), percentage from the model (not test) data loaded to split randomly to
-        validation
-        :param noise_ratio: float (0 to 1), ratio of noise of the total dataset.
-        :return: x_train, y_train, x_valid, y_valid, x_test, y_test, paths_list (of all the data)
-        """
-        x, y, paths_list = self.load_data(locations_to_exclude=None,
-                                          noise_ratio=noise_ratio)
-        x_model, x_test, y_model, y_test, paths_model, paths_test = train_test_split(x, y, paths_list,
-                                                                                     test_size=test_size, shuffle=True)
-        paths_test_df = pd.DataFrame({'path': paths_test})
-        paths_test_df = paths_test_df.assign(set='test')
-        x_train, x_valid, y_train, y_valid, paths_train, paths_valid = train_test_split(x_model, y_model, paths_model,
-                                                                                        test_size=valid_size,
-                                                                                        shuffle=True)
-        paths_train_df = pd.DataFrame({'path': paths_train})
-        paths_train_df = paths_train_df.assign(set='train')
-        paths_valid_df = pd.DataFrame({'path': paths_valid})
-        paths_valid_df = paths_valid_df.assign(set='valid')
-        paths_df = pd.concat([paths_train_df, paths_valid_df, paths_test_df])
-
-        return x_train, y_train, x_valid, y_valid, x_test, y_test, paths_df
-
-    def load_blocked_dataset(self, blocked_location, valid_size, noise_ratio, noise_ratio_test):
-        """
-        Same than load_all_dataset but the test is decided by the blocked location
-        :param blocked_location: string, name of the location to use for test and NOT for training or validation
-        :param valid_size: float (0 to 1), percentage from the model (not test) data loaded to split randomly to
-        validation
-        :param noise_ratio: float (0 to 1), ratio of noise of the total dataset.
-        :return: x_train, y_train, x_valid, y_valid, x_test, y_test, paths_list (of all the data)
-        """
-        selected_locs = list(set(self.locations) - {blocked_location})
-        x, y, paths_list_model = self.load_data(locations_to_exclude=[blocked_location],
-                                                noise_ratio=noise_ratio)
-        paths_model_df = pd.DataFrame({'path': paths_list_model})
-        x_train, x_valid, y_train, y_valid, paths_df_train, paths_df_valid = train_test_split(x, y,
-                                                                                              paths_model_df,
-                                                                                              test_size=valid_size,
-                                                                                              shuffle=True)
-        paths_model_df['set'] = None
-        paths_model_df.loc[paths_df_train.index, 'set'] = 'train'
-        paths_model_df.loc[paths_df_valid.index, 'set'] = 'valid'
-
-        x_test, y_test, paths_list_test = self.load_data(locations_to_exclude=selected_locs,
-                                                         noise_ratio=noise_ratio_test, test=True)
-        paths_test_df = pd.DataFrame({'path': paths_list_test})
-        paths_test_df = paths_test_df.assign(set='test')
-        paths_list_df = pd.concat([paths_model_df, paths_test_df])
-        return x_train, y_train, x_valid, y_valid, x_test, y_test, paths_list_df
-
-    def folds(self, noise_ratio, n_folds, valid_size):
-        """
-        Loop through the folds. The data will be first loaded (x, y) according to the samples per class and noise ratio.
-        Once the data is loaded, it will be split between model and test according to the folds.
-        Inside every fold, model split is split further into train and test, but this time randomly.
+        The function will return the selected data for all the classes together, shuffled.
+        For non-noise classes, the data included will be the first samples_per_class of the dataset (ordered),
+        excluding the ones corresponding to the locations to exclude, if any.
 
         :param noise_ratio: float (0 to 1), ratio of noise of the total dataset.
-        :param n_folds: number of folds to loop through
-        :param valid_size: float (0 to 1) validation split from the model split
-        :return: fold, x_train, y_train, x_vali, y_valid, x_test, y_test, paths_list (for all together)
+        :param locations_to_exclude: list of locations to not load (for blocked testing)
+        :return: x, y and paths
         """
-        x, y, paths_list = self.load_data(noise_ratio=noise_ratio,
-                                          locations_to_exclude=None)
-        kfold = StratifiedKFold(n_splits=n_folds, shuffle=True)
+        total_paths = []
 
-        for fold, (train_index, test_index) in enumerate(kfold.split(x, y)):
-            paths_df = pd.DataFrame({'path': paths_list})
-            paths_df['set'] = None
-            x_model = x[train_index]
-            y_model = y[train_index]
-            x_test = x[test_index]
-            y_test = y[test_index]
+        # Loop through all the categories
+        for cat_i, category in enumerate(self.int2class):
+            # If Noise, select a random amount
+            if category == 'Noise':
+                samples_to_load = self.get_noise_samples(noise_ratio)
+            else:
+                samples_to_load = self.samples_per_class
+            # Add the data from that category
+            print('selecting samples of category %s: %s' % (category, samples_to_load))
+            selected_paths = self.select_files_category(category, samples_to_load, locations_to_exclude)
+            total_paths += selected_paths
 
-            x_train, x_valid, y_train, y_valid, paths_df_train, paths_df_valid = train_test_split(x_model,
-                                                                                                  y_model, paths_df.loc[
-                                                                                                      train_index],
-                                                                                                  test_size=valid_size,
-                                                                                                  shuffle=True)
-            paths_df.loc[test_index, 'set'] = 'test'
-            paths_df.loc[paths_df_train.index, 'set'] = 'train'
-            paths_df.loc[paths_df_valid.index, 'set'] = 'valid'
-            yield fold, x_train, y_train, x_valid, y_valid, x_test, y_test, paths_df
+        total_paths = shuffle(total_paths)
+        return total_paths
 
-    def load_more_noise(self, x_test, y_test, paths_df, new_noise_ratio, phase):
+    def read_labels_from_file_list(self, file_list):
+        labels = []
+        for img_name in file_list:
+            category = img_name.split('_')[-1].split('.')[0]
+            joined_cat = self.map_join[category]
+
+            # This part is for joined classes
+            labels.append(self.classes2int[joined_cat])
+
+        y = np.array(labels)
+
+        return y
+
+    def load_from_file_list(self, file_list):
+        labels = []
+        images = []
+        for img_name in tqdm(file_list, total=len(file_list)):
+            category = img_name.split('_')[-1].split('.')[0]
+            joined_cat = self.map_join[category]
+
+            img_array = cv2.imread(os.path.join(self.data_dir, category, img_name))
+
+            grey_image = np.mean(img_array, axis=2)
+            images.append(grey_image)
+            # This part is for joined classes
+            labels.append(self.classes2int[joined_cat])
+
+        x = self.reshape_images(images)
+        y = np.array(labels)
+
+        return x, y
+
+    def load_set_from_df(self, paths_df, partition):
+        print('loading %s set in memory...' % partition)
+        paths_list = paths_df.loc[paths_df['set'] == partition, 'path'].values
+        return self.load_from_file_list(paths_list)
+
+    def select_more_noise(self, paths_df, new_noise_ratio, partition):
         """
         Append to x_test and y_test more noise, NOT repeated (not the same samples).
         The amount of noise added is according to the new_noise_ratio.
@@ -363,23 +335,18 @@ class SpectrogramDataSet:
         :return: updated x_test and y_test
         """
         noise_samples = self.get_noise_samples(new_noise_ratio)
+        y_test = self.read_labels_from_file_list(paths_df.loc[paths_df['set'] == partition, 'path'].values)
         new_noise_samples = noise_samples - (y_test == self.classes2int['Noise']).sum()
-        images, labels, new_paths_list = self.load_data_category('Noise', samples_to_load=new_noise_samples,
-                                                                 locations_to_exclude=None,
-                                                                 samples_to_exclude=paths_df['path'].values)
+        selected_paths = self.select_files_category('Noise', samples_to_load=new_noise_samples,
+                                                    locations_to_exclude=None,
+                                                    samples_to_exclude=paths_df['path'].values)
 
-        new_x = self.reshape_images(images)
-        new_y = np.array(labels)
-
-        x = np.concatenate([x_test, new_x])
-        y = np.concatenate([y_test, new_y])
-
-        new_paths_df = pd.DataFrame({'path': new_paths_list})
-        new_paths_df['set'] = phase
+        new_paths_df = pd.DataFrame({'path': selected_paths})
+        new_paths_df['set'] = partition
 
         paths_df = pd.concat([paths_df, new_paths_df])
 
-        return x, y, paths_df
+        return paths_df
 
     def get_noise_samples(self, noise_ratio):
         """
@@ -394,3 +361,37 @@ class SpectrogramDataSet:
         else:
             samples_per_class = self.samples_per_class
         return ((len(self.int2class) - 1) * samples_per_class * noise_ratio) / (1 - noise_ratio)
+
+    def batch_load_from_csv(self, csv_split_file, data_folder, data_split='test'):
+        batch_size = 16
+
+        data_split_df = pd.read_csv(csv_split_file)
+        data_split_test = data_split_df[data_split_df['set'] == data_split]
+        images_for_test = pd.Series(data_split_test['path'])
+
+        labels = []
+        images = []
+
+        for i, img_path in enumerate(images_for_test):
+            if (i % batch_size == 0) and (i != 0):
+                x = self.reshape_images(images)
+                y = np.array(labels)
+                images = []
+                labels = []
+
+                yield x, y, self, images_for_test
+
+            cat_folder = os.path.splitext(os.path.basename(img_path))[0].split('_')[2]
+            img_array = cv2.imread(os.path.join(data_folder, cat_folder, img_path))
+
+            # Not necessary if images already on the correct format
+            # resized_image = cv2.resize(img_array, (self.image_width, self.image_height))
+            grey_image = np.mean(img_array, axis=2)
+            images.append(grey_image)
+
+            # This part is for joined classes
+            labels.append(self.classes2int[self.map_join[cat_folder]])
+
+        x = self.reshape_images(images)
+        y = np.array(labels)
+        return x, y, self, images_for_test

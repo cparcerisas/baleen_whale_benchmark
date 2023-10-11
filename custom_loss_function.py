@@ -4,43 +4,21 @@ import tensorflow as tf
 from tensorflow.keras import losses
 from typing import Tuple
 
-
-# class WeightedSCCE(keras.losses.Loss):
-#     def __init__(self, class_weight, from_logits=False, name='weighted_scce'):
-#         if class_weight is None or all(v == 1. for v in class_weight):
-#             self.class_weight = None
-#         else:
-#             self.class_weight = tf.convert_to_tensor(class_weight,
-#                                                      dtype=tf.float32)
-#         self.name = name
-#         self.reduction = keras.losses.Reduction.NONE
-#         self.unreduced_scce = keras.losses.SparseCategoricalCrossentropy(
-#             from_logits=from_logits, name=name,
-#             reduction=self.reduction)
-#
-#     def __call__(self, y_true, y_pred, sample_weight=None):
-#         loss = self.unreduced_scce(y_true, y_pred, sample_weight)
-#         if self.class_weight is not None:
-#             weight_mask = tf.gather(self.class_weight, y_true)
-#             loss = tf.math.multiply(loss, weight_mask)
-#         return loss
-
-scenario_risk = {}
-#If prediction matches reality... it is good news so assign a standard weight of 1
-scenario_risk['prediction_matches_reality'] = 1.0
-#If call types are confused with each other we want e medium penalty
-scenario_risk['call_type_confusion'] = 3.0
-#If noise is predicted as call types we want a high penalty
-scenario_risk['noise_as_call_confusion'] = 15.0
-#If call types are predicted as noise we want a low penalty
-scenario_risk['calls_as_noise_confusion'] = 1.5
-
+# If prediction matches reality... it is good news so assign a standard weight of 1
+# If call types are confused with each other we want e medium penalty
+# If noise is predicted as call types we want a high penalty
+# If call types are predicted as noise we want a low penalty
+scenario_risk = {'prediction_matches_reality': 1.0,
+                 'call_type_confusion': 3.0,
+                 'noise_as_call_confusion': 15.0,
+                 'calls_as_noise_confusion': 1.5}
 
 scenario_risk_normalised = {}
 worst_case_scenario_risk = np.array(list(scenario_risk.values())).max()
 
 for key, value in scenario_risk.items():
     scenario_risk_normalised[key] = value / worst_case_scenario_risk
+
 
 @tf.function
 def _convert_scenario_risk_to_tensor(scenario: str) -> tf.Tensor:
@@ -66,6 +44,7 @@ def _convert_scenario_risk_to_tensor(scenario: str) -> tf.Tensor:
     """
 
     return tf.cast(x=tf.constant(scenario_risk_normalised[scenario]), dtype=tf.float32)
+
 
 @tf.function
 def _get_loss_adjustment_for_scenario(actual_vs_predicted_class: Tuple[tf.Tensor, tf.Tensor]) -> tf.Tensor:
@@ -107,6 +86,7 @@ def _get_loss_adjustment_for_scenario(actual_vs_predicted_class: Tuple[tf.Tensor
         ]
     )
 
+
 @tf.function
 def custom_cross_entropy(y_actual: tf.Tensor, y_prediction: tf.Tensor) -> tf.Tensor:
     """
@@ -136,10 +116,10 @@ def custom_cross_entropy(y_actual: tf.Tensor, y_prediction: tf.Tensor) -> tf.Ten
     predicted_class = tf.math.argmax(input=y_prediction, axis=1)
     predicted_class = tf.cast(x=predicted_class, dtype=tf.float32)
 
-    #actual_vs_predicted_class = tf.stack(values=[actual_class, predicted_class], axis=1)
+    # actual_vs_predicted_class = tf.stack(values=[actual_class, predicted_class], axis=1)
 
     # Calculate the weighting that should be applied to each observation in the data
-    #weighting = tf.map_fn(fn=_get_loss_adjustment_for_scenario, elems=actual_vs_predicted_class)
+    # weighting = tf.map_fn(fn=_get_loss_adjustment_for_scenario, elems=actual_vs_predicted_class)
     weighting = number_comparison(actual_class, predicted_class)
 
     # Updated the cross entropy loss based on the weighting
@@ -156,7 +136,3 @@ def number_comparison(actual, predicted):
     weightings = tf.where(new_tensor > 10, 1., weightings)
 
     return weightings
-
-
-
-

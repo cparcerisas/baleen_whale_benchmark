@@ -1,29 +1,59 @@
 {
-  "DATA_DIR": "/Users/eschall/Documents/Python/CNN+Noise/Specs",
-  "OUTPUT_DIR": "/Users/eschall/Documents/Python/CNN+Noise/Results/",
-  "LOCATIONS": ["RossSea2014", "BallenyIsland2015", "Casey2014","Casey2017", "ElephantIsland2013","ElephantIsland2014", "Kerguelen2005","Kerguelen2014","Kerguelen2015", "Greenwich2015", "MaudRise2014"],
-  "CATEGORIES" : ["20Plus", "20Hz", "A", "B", "D", "Dswp", "Z", "Noise"],
+  "DATA_DIR": "/mnt/fscompute_shared/Miller_AntarcticData/Specs_sequenced",
+  "OUTPUT_DIR": "/mnt/fscompute_shared/Miller_AntarcticData/CNN+Noise_Results/",
+  "LOCATIONS": [
+    "RossSea2014",
+    "BallenyIsland2015",
+    "Casey2014",
+    "Casey2017",
+    "ElephantIsland2013",
+    "ElephantIsland2014",
+    "Kerguelen2005",
+    "Kerguelen2014",
+    "Kerguelen2015",
+    "Greenwich2015",
+    "MaudRise2014"
+  ],
+  "CATEGORIES": [
+    "20Plus",
+    "20Hz",
+    "A",
+    "B",
+    "D",
+    "Dswp",
+    "Z",
+    "Noise"
+  ],
   "CATEGORIES_TO_JOIN": {
-                          "20Hz20Plus":  ["20Plus","20Hz"],
-                          "ABZ":  ["A","B", "Z"],
-                          "DDswp": ["D", "Dswp"]
-                        },
-  "SAMPLES_PER_CLASS": 2500,
-
-  "NOISE_RATIO": [0.125, 0.9],
-  "NOISE_RATIO_TEST": [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9],
+    "20Hz20Plus": [
+      "20Plus",
+      "20Hz"
+    ],
+    "ABZ": [
+      "A",
+      "B",
+      "Z"
+    ],
+    "DDswp": [
+      "D",
+      "Dswp"
+    ]
+  },
+  "SAMPLES_PER_CLASS": 200,
+  "NOISE_RATIO": [
+    0.25
+  ],
+  "NOISE_RATIO_TEST": [0.01, "all"],
   "USE_CORRECTED_DATASET": false,
-
   "VALID_SPLIT": 0.3,
-  "TEST_SPLIT": 5,
-
+  "TEST_SPLIT": "blocked",
   "model_name": "IdilCNN",
   "BATCH_SIZE": 32,
   "EPOCHS": 100,
-  "early_stop": 10,
-  "monitoring_metric": "val_accuracy",
+  "early_stop": 20,
+  "monitoring_metric": "val_imbalanced_metric",
   "monitoring_direction": "max",
   "loss_function": "custom_cross_entropy",
-  "learning_rate": 1e-3,
+  "learning_rate": 0.001,
   "CLASS_WEIGHTS": null
 }
