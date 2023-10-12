@@ -40,20 +40,19 @@
     ]
   },
   "SAMPLES_PER_CLASS": 200,
-  "NOISE_RATIO": [
-    0.25
-  ],
+  "NOISE_RATIO": [0.25],
   "NOISE_RATIO_TEST": ["all"],
   "USE_CORRECTED_DATASET": false,
   "VALID_SPLIT": 0.3,
   "TEST_SPLIT": "blocked",
   "model_name": "IdilCNN",
   "BATCH_SIZE": 32,
-  "EPOCHS": 100,
+  "EPOCHS": 3,
   "early_stop": 20,
   "monitoring_metric": "val_imbalanced_metric",
   "monitoring_direction": "max",
   "loss_function": "custom_cross_entropy",
   "learning_rate": 0.001,
-  "CLASS_WEIGHTS": null
+  "CLASS_WEIGHTS": null,
+  "test_after_training": false
 }

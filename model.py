@@ -23,11 +23,16 @@ from custom_loss_function import custom_cross_entropy
 
 
 class Model:
-    def __init__(self, log_path, categories):
+    def __init__(self, save_path, categories, model_name):
         """
         Initialize the model with the folder
         """
-        self.log_path = log_path
+        self.save_path = save_path
+
+        self.model_name = model_name
+        self.log_path = save_path.joinpath(model_name)
+        if not self.log_path.exists():
+            os.mkdir(str(self.log_path))
 
         detection_metrics = metrics.ImbalancedDetectionMatrix(noise_class_name='Noise', classes_names=categories)
         self.metrics = [
@@ -175,8 +180,8 @@ class Model:
         scores_df = pd.DataFrame([scores], columns=self.model.metrics_names)
         return scores_df, con_mat_df, preds
 
-    def save(self, extra_info):
-        self.model.save(self.log_path.joinpath('_'.join(['model', str(extra_info)])))
+    def save(self):
+        self.model.save(self.log_path.joinpath('model'))
 
     @staticmethod
     def get_confusion_matrix(y_test, y_pred, categories):
@@ -186,10 +191,10 @@ class Model:
         con_mat_df = pd.DataFrame(con_mat, index=categories, columns=categories)
         return con_mat_df, y_pred
 
-    def predict_full_ds(self, ds):
+    def predict_full_ds(self, ds, csv_split_file):
         y_pred_total = None
         y_test_total = None
-        for x_test, y_test, ds, images_for_test in ds.load_from_csv(csv_split_file=csv_split_file,):
+        for x_test, y_test, ds, images_for_test in ds.load_from_csv(csv_split_file=csv_split_file):
             y_pred = self.model.predict(x_test)
             if y_pred_total is None:
                 y_pred_total = y_pred
@@ -200,13 +205,12 @@ class Model:
 
         con_mat_df, predictions = self.get_confusion_matrix(y_test, y_pred, categories=ds.int2class)
 
-        log_path = pathlib.Path(os.path.split(self.log_path)[0])
         preds = pd.concat([pd.DataFrame(predictions), pd.DataFrame(images_for_test)], axis=1)
-        preds.to_csv(log_path.joinpath('prediction.csv'))
-
+        preds.to_csv(self.log_path.joinpath('prediction.csv'))
+        con_mat_df.to_csv(self.log_path.joinpath('confusion_matrix'))
         return con_mat_df
 
-    def plot_training_metrics(self, history, fold, chosen_metric):
+    def plot_training_metrics(self, history, chosen_metric):
         """
         Plot the history evolution of the metrics of the model and store the images in the folder save_path with the
         correct name indicating which fold was it run
@@ -232,7 +236,7 @@ class Model:
         plt.xticks(np.arange(0, max(epoch_count), 2))
         # plt.text(10, 0.01, "Test acc: " + str(scores[1]))
         plt.grid()
-        plt.savefig(self.log_path.joinpath('training_%s_fold_%s.png' % (chosen_metric, fold)))
+        plt.savefig(self.log_path.joinpath('training_%s_%s.png' % (chosen_metric, self.model_name)))
         plt.close()
 
         plt.figure(figsize=(8, 8))
@@ -244,7 +248,7 @@ class Model:
         plt.yticks(np.arange(0, max(val_loss), 0.2))
         plt.xticks(np.arange(0, max(epoch_count), 2))
         plt.grid()
-        plt.savefig(self.log_path.joinpath('training_loss_fold_%s.png' % fold))
+        plt.savefig(self.log_path.joinpath('training_loss_%s.png' % self.model_name))
         plt.close()
 
 

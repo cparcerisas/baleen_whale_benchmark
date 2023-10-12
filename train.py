@@ -56,10 +56,8 @@ def run_from_config(config_path, log_path=None):
         paths_df = ds.prepare_all_dataset(test_size=config['TEST_SPLIT'], valid_size=config['VALID_SPLIT'],
                                           noise_ratio=noise_init_training)
         # Create and train the model
-        scores_i, con_matrix_i = training.create_train_and_test_model(log_path, paths_df, config=config,
-                                                                      fold=0, ds=ds)
-
-        # scores.loc[0] = ['random', scores_i[0], scores_i[1]]
+        scores_i, con_matrix_i = training.run_multiple_models(log_path, paths_df, config=config, fold=0, ds=ds,
+                                                              perform_test=config['test_after_training'])
         scores = scores_i
         con_matrix = con_matrix_i.reset_index(drop=False, names='label')
 
@@ -71,9 +69,8 @@ def run_from_config(config_path, log_path=None):
         for fold, paths_df in ds.folds(noise_ratio=noise_init_training,
                                        n_folds=config['TEST_SPLIT'], valid_size=config['VALID_SPLIT']):
             # Create and train the model
-            scores_i, con_matrix_i = training.create_and_train_model(log_path, paths_df, config=config,
-                                                                     fold=fold, ds=ds)
-
+            scores_i, con_matrix_i = training.run_multiple_models(log_path, paths_df, config=config, fold=fold, ds=ds,
+                                                                  perform_test=config['test_after_training'])
             scores_i['fold'] = fold
             scores = pd.concat([scores, scores_i], ignore_index=True)
             con_matrix_i = con_matrix_i.reset_index(drop=False, names='label')
@@ -89,8 +86,8 @@ def run_from_config(config_path, log_path=None):
                                                   blocked_location=loc,
                                                   noise_ratio_test=noise_init_test)
             # Create and train the model
-            scores_i, con_matrix_i = training.create_train_and_test_model(log_path, paths_df, config=config,
-                                                                          fold=loc, ds=ds)
+            scores_i, con_matrix_i = training.run_multiple_models(log_path, paths_df, config=config, fold=loc, ds=ds,
+                                                                  perform_test=config['test_after_training'])
 
             scores_i['fold'] = loc
             scores = pd.concat([scores, scores_i], ignore_index=True)
@@ -98,11 +95,12 @@ def run_from_config(config_path, log_path=None):
             con_matrix_i['fold'] = loc
             con_matrix = pd.concat([con_matrix, con_matrix_i], ignore_index=True)
 
-    con_matrix.to_csv(log_path.joinpath('total_confusion_matrix.csv'))
-    scores.to_csv(log_path.joinpath('total_scores.csv'))
-    con_matrix = con_matrix.drop(columns=['fold'])
-    con_matrix_avg = con_matrix.groupby('label').mean()
-    model.plot_confusion_matrix(con_matrix_avg, save_path=log_path.joinpath('mean_confusion_matrix.png'))
+    if config['test_after_training']:
+        con_matrix.to_csv(log_path.joinpath('total_confusion_matrix.csv'))
+        scores.to_csv(log_path.joinpath('total_scores.csv'))
+        con_matrix = con_matrix.drop(columns=['fold'])
+        con_matrix_avg = con_matrix.groupby('label').mean()
+        model.plot_confusion_matrix(con_matrix_avg, save_path=log_path.joinpath('mean_confusion_matrix.png'))
 
     return scores, con_matrix
 
