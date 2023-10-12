@@ -107,8 +107,7 @@ class SpectrogramDataSet:
         :param noise_ratio: float (0 to 1), ratio of noise of the total dataset.
         :return: x_train, y_train, x_valid, y_valid, x_test, y_test, paths_list (of all the data)
         """
-        paths_list = self.select_data(locations_to_exclude=None,
-                                          noise_ratio=noise_ratio)
+        paths_list = self.select_data(locations_to_exclude=None, noise_ratio=noise_ratio)
         x, y = self.load_from_file_list(file_list=paths_list)
         x_model, x_test, y_model, y_test, paths_model, paths_test = train_test_split(x, y, paths_list,
                                                                                      test_size=test_size, shuffle=True)
@@ -356,11 +355,14 @@ class SpectrogramDataSet:
         :param noise_ratio: float (0 to 1), ratio of noise of the total dataset.
         :return: number of samples
         """
-        if self.samples_per_class == 'all':
-            samples_per_class = self.how_many_samples()
+        if noise_ratio == 'all':
+            return noise_ratio
         else:
-            samples_per_class = self.samples_per_class
-        return ((len(self.int2class) - 1) * samples_per_class * noise_ratio) / (1 - noise_ratio)
+            if self.samples_per_class == 'all':
+                samples_per_class = self.how_many_samples()
+            else:
+                samples_per_class = self.samples_per_class
+            return ((len(self.int2class) - 1) * samples_per_class * noise_ratio) / (1 - noise_ratio)
 
     def batch_load_from_csv(self, csv_split_file, data_folder, data_split='test'):
         batch_size = 16

@@ -43,7 +43,7 @@
   "NOISE_RATIO": [
     0.25
   ],
-  "NOISE_RATIO_TEST": [0.01, "all"],
+  "NOISE_RATIO_TEST": ["all"],
   "USE_CORRECTED_DATASET": false,
   "VALID_SPLIT": 0.3,
   "TEST_SPLIT": "blocked",

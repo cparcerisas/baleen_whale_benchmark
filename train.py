@@ -84,12 +84,10 @@ def run_from_config(config_path, log_path=None):
         print('Performing blocked cross validation for each location (leave location out). '
               'Results are given per excluded location')
         for loc in config['LOCATIONS']:
-            paths_df = ds.prepare_blocked_dataset(
-                                                    valid_size=config[
-                                                        'VALID_SPLIT'],
-                                                    noise_ratio=noise_init_training,
-                                                    blocked_location=loc,
-                                                    noise_ratio_test=noise_init_test)
+            paths_df = ds.prepare_blocked_dataset(valid_size=config['VALID_SPLIT'],
+                                                  noise_ratio=noise_init_training,
+                                                  blocked_location=loc,
+                                                  noise_ratio_test=noise_init_test)
             # Create and train the model
             scores_i, con_matrix_i = training.create_train_and_test_model(log_path, paths_df, config=config,
                                                                           fold=loc, ds=ds)
