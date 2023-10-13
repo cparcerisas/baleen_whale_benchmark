@@ -56,22 +56,24 @@ def run_multiple_models(log_path, paths_df, config, fold, ds, perform_test=False
         paths_df2, noise = select_more_noise(paths_df1, 'valid', noise_before, noise, config, ds)
         cnn_model = create_and_train_model(log_path, paths_df2, ds, config, model_name=model_name)
         if perform_test:
-            scores_i, con_mat_i = test_model_multiple_noise(cnn_model, paths_df, config, ds, fold, log_path, noise)
+            scores_i, con_mat_i = test_model_multiple_noise(cnn_model, paths_df, config, ds, fold, log_path)
             scores = pd.concat([scores, scores_i])
             con_mat_df = pd.concat([con_mat_df, con_mat_i])
 
     return scores, con_mat_df
 
 
-def test_model_multiple_noise(cnn_model, paths_df, config, ds, fold, log_path, train_noise):
+def test_model_multiple_noise(cnn_model, paths_df, config, ds, fold, log_path):
     if type(config['NOISE_RATIO_TEST']) == list:
         noise_to_test = config['NOISE_RATIO_TEST']
     else:
         noise_to_test = [config['NOISE_RATIO_TEST']]
 
+    last_noise = noise_to_test[0]
     for noise_test in noise_to_test:
-        paths_df, noise = select_more_noise(paths_df, 'test', train_noise, noise_test, config, ds)
+        paths_df, train_noise = select_more_noise(paths_df, 'test', last_noise, noise_test, config, ds)
         x_test, y_test = ds.load_set_from_df(paths_df, 'test')
+        last_noise = noise_test
         scores_noise, con_mat_noise, predictions = cnn_model.test(x_test, y_test, ds.categories,
                                                                   paths_df.path[paths_df.set == 'test'])
 
@@ -102,12 +104,16 @@ def test_model_from_folder(folder_path, ds):
     return con_mat
 
 
-def select_more_noise(paths_df, phase, noise, noise2, config, ds):
-    if noise != 'all':
+def select_more_noise(paths_df, phase, noise, new_noise, config, ds):
+    if noise == new_noise:
+        return paths_df, noise
+    elif new_noise == 'all':
+        paths_df = ds.select_more_noise(paths_df, new_noise, phase)
+    elif noise != 'all':
         if phase == 'test':
-            if noise2 > config['NOISE_RATIO'][0]:
-                paths_df = ds.select_more_noise(paths_df, noise2, phase)
-            elif noise2 < config['NOISE_RATIO'][0]:
+            if new_noise > noise:
+                paths_df = ds.select_more_noise(paths_df, new_noise, phase)
+            elif new_noise < config['NOISE_RATIO'][0]:
                 print(
                     'Noise percentage lower than in first training. '
                     'Not considering it and testing on the first training ratio'
@@ -115,7 +121,7 @@ def select_more_noise(paths_df, phase, noise, noise2, config, ds):
                 noise2 = config['NOISE_RATIO'][0]
 
         else:
-            if noise2 > noise:
-                paths_df = ds.select_more_noise(paths_df, noise2, phase)
+            if new_noise > noise:
+                paths_df = ds.select_more_noise(paths_df, new_noise, phase)
 
     return paths_df, noise2

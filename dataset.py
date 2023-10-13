@@ -327,10 +327,9 @@ class SpectrogramDataSet:
         Append to x_test and y_test more noise, NOT repeated (not the same samples).
         The amount of noise added is according to the new_noise_ratio.
 
-        :param x_test: existing x_test
-        :param y_test: existing y_test
         :param paths_df: pd.DataFrame with all the paths of the images corresponding used
         :param new_noise_ratio: new ratio (0 to 1) of noise from the total dataset
+        :param partition: train, valid or test
         :return: updated x_test and y_test
         """
         noise_samples = self.get_noise_samples(new_noise_ratio)
