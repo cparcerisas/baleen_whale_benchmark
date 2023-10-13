@@ -69,17 +69,9 @@ def test_model_multiple_noise(cnn_model, paths_df, config, ds, fold, log_path, t
     else:
         noise_to_test = [config['NOISE_RATIO_TEST']]
 
-    x_test = None
-    y_test = None
-
     for noise_test in noise_to_test:
-        if x_test is None:
-            x_test, y_test = ds.load_test()
-        else:
-            paths_df, noise = select_more_noise(paths_df, 'test', train_noise, noise_test, config, ds)
-
-        ds.load_set_from_df(paths_df, 'test')
-
+        paths_df, noise = select_more_noise(paths_df, 'test', train_noise, noise_test, config, ds)
+        x_test, y_test = ds.load_set_from_df(paths_df, 'test')
         scores_noise, con_mat_noise, predictions = cnn_model.test(x_test, y_test, ds.categories,
                                                                   paths_df.path[paths_df.set == 'test'])
 
