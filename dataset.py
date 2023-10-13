@@ -130,7 +130,7 @@ class SpectrogramDataSet:
         selected_locs = list(set(self.locations) - {blocked_location})
         print('selecting model data...')
         paths_list_model = self.select_data(locations_to_exclude=[blocked_location], noise_ratio=noise_ratio)
-        x, y = self.load_from_file_list(file_list=paths_list_model)
+        y = self.read_labels_from_file_list(file_list=paths_list_model)
         paths_train, paths_valid = train_test_split(paths_list_model, stratify=y, test_size=valid_size, shuffle=True)
 
         print('selecting test data...')
@@ -203,10 +203,10 @@ class SpectrogramDataSet:
                 samples_df['needed'] = samples_per_subcategory
                 samples_df['samples_to_load'] = samples_df[['available', 'needed']].min()
                 total_loaded = samples_df.samples_to_load.sum()
-                while total_loaded < num_samples:
-                    leftover = num_samples - total_loaded
+                while total_loaded < samples_to_load:
+                    leftover = samples_to_load - total_loaded
                     samples_df['needed'] += round(leftover / (samples_df['available'] > samples_df['needed']).sum())
-                    samples_df['samples_to_load'] = samples_df[['available', 'needed']].min()
+                    samples_df['samples_to_load'] = samples_df[['available', 'needed']].min(axis=1)
                     total_loaded = samples_df.samples_to_load.sum()
                 samples_to_load_per_subcat = samples_df['samples_to_load'].values
         else:
