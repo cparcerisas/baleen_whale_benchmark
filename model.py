@@ -191,11 +191,11 @@ class Model:
         con_mat_df = pd.DataFrame(con_mat, index=categories, columns=categories)
         return con_mat_df, y_pred
 
-    def predict_full_ds(self, ds, csv_split_file):
+    def test_in_batches(self, ds, data_split_df):
         y_pred_total = None
         y_test_total = None
-        for x_test, y_test, ds, images_for_test in ds.load_from_csv(csv_split_file=csv_split_file):
-            y_pred = self.model.predict(x_test)
+        for x_test, y_test, ds, images_for_test in ds.batch_load_from_df(data_split_df, data_split='test'):
+            y_pred = self.model.predict_on_batch(x_test)
             if y_pred_total is None:
                 y_pred_total = y_pred
                 y_test_total = y_test

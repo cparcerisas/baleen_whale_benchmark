@@ -72,10 +72,8 @@ def test_model_multiple_noise(cnn_model, paths_df, config, ds, fold, log_path):
     last_noise = noise_to_test[0]
     for noise_test in noise_to_test:
         paths_df, train_noise = select_more_noise(paths_df, 'test', last_noise, noise_test, config, ds)
-        x_test, y_test = ds.load_set_from_df(paths_df, 'test')
         last_noise = noise_test
-        scores_noise, con_mat_noise, predictions = cnn_model.test(x_test, y_test, ds.categories,
-                                                                  paths_df.path[paths_df.set == 'test'])
+        scores_noise, con_mat_noise, predictions = cnn_model.test_in_batches(ds, data_split_df=paths_df)
 
         # Add the metadata
         scores_noise['noise_percentage_train'] = train_noise

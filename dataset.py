@@ -363,17 +363,16 @@ class SpectrogramDataSet:
                 samples_per_class = self.samples_per_class
             return ((len(self.int2class) - 1) * samples_per_class * noise_ratio) / (1 - noise_ratio)
 
-    def batch_load_from_csv(self, csv_split_file, data_folder, data_split='test'):
+    def batch_load_from_df(self, data_split_df, data_split='test'):
         batch_size = 16
 
-        data_split_df = pd.read_csv(csv_split_file)
         data_split_test = data_split_df[data_split_df['set'] == data_split]
         images_for_test = pd.Series(data_split_test['path'])
 
         labels = []
         images = []
 
-        for i, img_path in enumerate(images_for_test):
+        for i, img_path in tqdm(enumerate(images_for_test), total=len(images_for_test)):
             if (i % batch_size == 0) and (i != 0):
                 x = self.reshape_images(images)
                 y = np.array(labels)
@@ -383,7 +382,7 @@ class SpectrogramDataSet:
                 yield x, y, self, images_for_test
 
             cat_folder = os.path.splitext(os.path.basename(img_path))[0].split('_')[2]
-            img_array = cv2.imread(os.path.join(data_folder, cat_folder, img_path))
+            img_array = cv2.imread(os.path.join(self.data_dir, cat_folder, img_path))
 
             # Not necessary if images already on the correct format
             # resized_image = cv2.resize(img_array, (self.image_width, self.image_height))

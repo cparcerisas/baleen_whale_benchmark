@@ -54,5 +54,5 @@
   "loss_function": "custom_cross_entropy",
   "learning_rate": 0.001,
   "CLASS_WEIGHTS": null,
-  "test_after_training": false
+  "test_after_training": true
 }
