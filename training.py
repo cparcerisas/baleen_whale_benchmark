@@ -70,6 +70,8 @@ def test_model_multiple_noise(cnn_model, paths_df, config, ds, fold, log_path):
         noise_to_test = [config['NOISE_RATIO_TEST']]
 
     last_noise = noise_to_test[0]
+    scores_i = pd.DataFrame()
+    con_mat_df = pd.DataFrame()
     for noise_test in noise_to_test:
         paths_df, train_noise = select_more_noise(paths_df, 'test', last_noise, noise_test, config, ds)
         last_noise = noise_test
