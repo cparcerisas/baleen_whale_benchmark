@@ -70,22 +70,22 @@ def test_model_multiple_noise(cnn_model, paths_df, config, ds, fold, log_path):
         noise_to_test = [config['NOISE_RATIO_TEST']]
 
     last_noise = noise_to_test[0]
+    scores_i = pd.DataFrame()
+    con_mat_df = pd.DataFrame()
     for noise_test in noise_to_test:
         paths_df, train_noise = select_more_noise(paths_df, 'test', last_noise, noise_test, config, ds)
         last_noise = noise_test
         scores_noise, con_mat_noise, predictions = cnn_model.test_in_batches(ds, data_split_df=paths_df)
 
+        model.plot_confusion_matrix(con_mat_noise, log_path.joinpath('confusion_matrix_fold%s_noise%s_noise%s.png' %
+                                                                     (fold, train_noise, noise_test)))
         # Add the metadata
         scores_noise['noise_percentage_train'] = train_noise
-        con_mat_noise['noise_percentage_train'] = train_noise
         scores_noise['noise_percentage_test'] = noise_test
-        con_mat_noise['noise_percentage_test'] = noise_test
 
         scores_i = pd.concat([scores_i, scores_noise])
         con_mat_df = pd.concat([con_mat_df, con_mat_noise])
 
-        model.plot_confusion_matrix(con_mat_noise, log_path.joinpath('confusion_matrix_fold%s_noise%s_noise%s.png' %
-                                                                      (fold, train_noise, noise_test)))
         paths_df.to_csv(
             log_path.joinpath('data_used_fold%s_noise%s_noise%s.csv' % (fold, train_noise, noise_test)))
         predictions.to_csv(

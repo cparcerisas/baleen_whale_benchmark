@@ -189,7 +189,7 @@ class Model:
         con_mat = confusion_matrix(y_test, y_pred, labels=np.arange(len(categories)))
 
         con_mat_df = pd.DataFrame(con_mat, index=categories, columns=categories)
-        return con_mat_df, y_pred
+        return con_mat_df
 
     def test_in_batches(self, ds, data_split_df):
         y_pred_total = None
@@ -203,12 +203,13 @@ class Model:
                 y_pred_total = np.concatenate([y_pred_total, y_pred])
                 y_test_total = np.concatenate([y_test_total, y_test])
 
-        con_mat_df, predictions = self.get_confusion_matrix(y_test, y_pred, categories=ds.int2class)
+        con_mat_df = self.get_confusion_matrix(y_test_total, y_pred_total, categories=ds.int2class)
 
-        preds = pd.concat([pd.DataFrame(predictions), pd.DataFrame(images_for_test)], axis=1)
-        preds.to_csv(self.log_path.joinpath('prediction.csv'))
-        con_mat_df.to_csv(self.log_path.joinpath('confusion_matrix'))
-        return con_mat_df
+        preds = pd.concat([pd.DataFrame(y_pred_total), pd.DataFrame(images_for_test)], axis=1)
+        scores = pd.DataFrame(y_pred_total)
+        #preds.to_csv(self.log_path.joinpath('prediction.csv'))
+        #con_mat_df.to_csv(self.log_path.joinpath('confusion_matrix'))
+        return scores, con_mat_df, preds
 
     def plot_training_metrics(self, history, chosen_metric):
         """

@@ -39,7 +39,7 @@
       "Dswp"
     ]
   },
-  "SAMPLES_PER_CLASS": 200,
+  "SAMPLES_PER_CLASS": 30000,
   "NOISE_RATIO": [0.25],
   "NOISE_RATIO_TEST": ["all"],
   "USE_CORRECTED_DATASET": false,
@@ -47,7 +47,7 @@
   "TEST_SPLIT": "blocked",
   "model_name": "IdilCNN",
   "BATCH_SIZE": 32,
-  "EPOCHS": 3,
+  "EPOCHS": 100,
   "early_stop": 20,
   "monitoring_metric": "val_imbalanced_metric",
   "monitoring_direction": "max",
