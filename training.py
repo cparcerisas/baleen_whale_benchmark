@@ -85,7 +85,7 @@ def test_model_multiple_noise(cnn_model, paths_df, config, ds, fold, log_path):
         con_mat_df = pd.concat([con_mat_df, con_mat_noise])
 
         model.plot_confusion_matrix(con_mat_noise, log_path.joinpath('confusion_matrix_fold%s_noise%s_noise%s.png' %
-                                                                         (fold, train_noise, noise_test)))
+                                                                      (fold, train_noise, noise_test)))
         paths_df.to_csv(
             log_path.joinpath('data_used_fold%s_noise%s_noise%s.csv' % (fold, train_noise, noise_test)))
         predictions.to_csv(
