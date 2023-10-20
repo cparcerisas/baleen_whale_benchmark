@@ -288,7 +288,7 @@ class SpectrogramDataSet:
     def read_labels_from_file_list(self, file_list):
         labels = []
         for img_name in file_list:
-            category = img_name.split('_')[-1].split('.')[0]
+            category = img_name.split('_')[2].split('.')[0]
             joined_cat = self.map_join[category]
 
             # This part is for joined classes
@@ -302,7 +302,7 @@ class SpectrogramDataSet:
         labels = []
         images = []
         for img_name in tqdm(file_list, total=len(file_list)):
-            category = img_name.split('_')[-1].split('.')[0]
+            category = img_name.split('_')[2].split('.')[0]
             joined_cat = self.map_join[category]
 
             img_array = cv2.imread(os.path.join(self.data_dir, category, img_name))
@@ -394,4 +394,4 @@ class SpectrogramDataSet:
 
         x = self.reshape_images(images)
         y = np.array(labels)
-        return x, y, self, images_for_test
+        yield x, y, self, images_for_test
