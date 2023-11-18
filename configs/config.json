@@ -1,18 +1,18 @@
 {
-  "DATA_DIR": "/mnt/fscompute_shared/Miller_AntarcticData/Specs_sequenced2",
+  "DATA_DIR": "/mnt/fscompute_shared/Miller_AntarcticData/Specs_sequenced",
   "OUTPUT_DIR": "/mnt/fscompute_shared/Miller_AntarcticData/CNN+Noise_Results/",
   "LOCATIONS": [
-    "BallenyIslands2015",
-    "casey2014",
-    "casey2017",
+    "RossSea2014",
+    "BallenyIsland2015",
+    "Casey2014",
+    "Casey2017",
     "ElephantIsland2013",
     "ElephantIsland2014",
-    "kerguelen2005",
-    "kerguelen2014",
-    "kerguelen2015",
-    "Greenwich64S2015",
-    "MaudRise2014",
-    "RossSea2014"
+    "Kerguelen2005",
+    "Kerguelen2014",
+    "Kerguelen2015",
+    "Greenwich2015",
+    "MaudRise2014"
   ],
   "CATEGORIES": [
     "20Plus",
