@@ -8,11 +8,11 @@ def create_and_train_model(save_path, paths_df, ds, config, model_name):
     """
     Create and train model, from config
 
-    :param log_path:
+    :param save_path:
     :param paths_df:
     :param ds:
     :param config:
-    :param fold:
+    :param model_name:
     :return:
     """
     print(config['CATEGORIES'])
