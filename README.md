@@ -4,7 +4,7 @@ This code is intended to be used to reproduce a part of the results from the pap
 "Deep learning in marine bioacoustics: A benchmark for baleen whale detection. In preparation"
 
 ## How should the data be organized 
-Wav data should be converted to sequenced spectrograms. 
+Wav data should be converted to sequenced spectrograms.  
 The spectrograms data should be contained in one folder, with one subfolder per each original class (original class,
 not joined class). 
 In the main folder, next to the subfolders, a csv file per original class with all samples wrongly classified can 
@@ -14,6 +14,12 @@ Inside the subfolders, the files should be: n_locationyear_class.png, where n is
 location-year combination. 
 locationyear is the location and the year of the deployment and class is the label of the image. 
 For example: 1_BallenyIsland2015_20Hz
+
+A script is provided in this repository to preprocess the data: 
+preprocess_data_for_CNN_input.py 
+
+If you run that script and provide all the necessary information when prompted with the questions, the spectrograms 
+will be generated with the right structure.
 
 ## How to specify parameters
 All the parameters have to be defined in a json config file. An example can be found in this repository config.json.
@@ -112,3 +118,7 @@ The output in the selected output folder will be:
   * A mean confusion matrix
 
 
+## How to evaluate - Benchmark
+To evaluate the results of a model, run the evaluation.py script. 
+Just need to provide the csv of the results, the ground truth, the list of classes and where do you want to store 
+the results. 
