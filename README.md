@@ -1,8 +1,7 @@
 # A Benchmark for baleen whale detection
 
 This code is intended to be used to reproduce a part of the results from the paper 
-"Schall, E., Kaya, I., Debusschere, E., Devos, P. & Parcerisas, C. (2023). 
-Deep learning in marine bioacoustics: A benchmark for baleen whale detection. In preparation"
+"Deep learning in marine bioacoustics: A benchmark for baleen whale detection. In preparation"
 
 ## How should the data be organized 
 Wav data should be converted to sequenced spectrograms. 
