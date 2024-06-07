@@ -61,7 +61,7 @@ def main():
     TCR = np.average(TCRs)
     NMR = sum(NMRs) / confusion_matrix[-2, -1]
     CMR = np.average(CMRs)
-    F = np.average([TCR, (1 - NMR), (1 - NMR), CMR])
+    F = np.average([TCR, (1 - NMR), (1 - NMR), (1 - CMR)])
 
     # Save confusion matrix and evaluation metrics to csv
     DF = pd.DataFrame(confusion_matrix)
